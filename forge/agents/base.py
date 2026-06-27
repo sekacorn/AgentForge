@@ -95,9 +95,21 @@ class BaseAgent(abc.ABC):
         ctx.events.emit(
             EventType.MODEL_CALL_STARTED, run_id=ctx.run_id, agent=self.name, model=decision.model
         )
-        response = await provider.complete(
-            messages, model=decision.model, tools=tools, max_tokens=max_tokens
-        )
+        try:
+            response = await provider.complete(
+                messages, model=decision.model, tools=tools, max_tokens=max_tokens
+            )
+        except Exception as exc:
+            # Surface model/provider failures on the event stream (symmetric with
+            # tool failures) before letting the error propagate and be audited.
+            ctx.events.emit(
+                EventType.MODEL_CALL_FAILED,
+                run_id=ctx.run_id,
+                agent=self.name,
+                model=decision.model,
+                error=str(exc),
+            )
+            raise
 
         # Pricing is resolved centrally from the registry, never the provider.
         response.usage.cost_usd = info.cost(response.usage)

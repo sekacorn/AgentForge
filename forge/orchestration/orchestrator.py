@@ -183,7 +183,9 @@ class Orchestrator:
                 result = await supervisor.run(clean_goal)
             else:  # pragma: no cover - guarded by typing
                 raise ConfigurationError(f"Unknown run mode {mode!r}")
-        except ForgeError as exc:
+        except Exception as exc:
+            # Audit and surface *any* failure (not only ForgeError) so the run's
+            # outcome is always recorded, then re-raise for the caller to handle.
             self.events.emit(EventType.RUN_FINISHED, run_id=run_id, success=False, error=str(exc))
             self.audit.record(
                 "run.finish", actor=actor.id, run_id=run_id, outcome="error", error=str(exc)

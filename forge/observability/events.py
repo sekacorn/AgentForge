@@ -35,6 +35,7 @@ class EventType(enum.StrEnum):
     AGENT_FAILED = "agent.failed"
     MODEL_CALL_STARTED = "model.call.started"
     MODEL_CALL_FINISHED = "model.call.finished"
+    MODEL_CALL_FAILED = "model.call.failed"
     MODEL_ROUTED = "model.routed"
     TOOL_CALL_STARTED = "tool.call.started"
     TOOL_CALL_FINISHED = "tool.call.finished"

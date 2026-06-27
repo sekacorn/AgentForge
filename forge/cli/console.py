@@ -39,6 +39,8 @@ def make_event_renderer(console: Console):  # type: ignore[no-untyped-def]
                 f"   [dim]{data.get('model')}: {data.get('tokens')} tok / "
                 f"${data.get('cost_usd', 0):.4f}[/]"
             )
+        elif event.type is EventType.MODEL_CALL_FAILED:
+            console.print(f"   [red]✗ model {data.get('model')}: {data.get('error')}[/]")
         elif event.type is EventType.TOOL_CALL_STARTED:
             console.print(f"   [yellow]⚙ {data.get('tool')}[/]({data.get('arguments')})")
         elif event.type is EventType.TOOL_CALL_FINISHED:

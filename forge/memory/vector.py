@@ -10,6 +10,7 @@ don't change.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 
@@ -20,6 +21,17 @@ _TOKEN = re.compile(r"[a-z0-9]+")
 
 def _tokenize(text: str) -> list[str]:
     return _TOKEN.findall(text.lower())
+
+
+def _stable_bucket(token: str, dim: int) -> int:
+    """Map a token to a bucket with a process-independent hash.
+
+    Python's built-in ``hash`` is salted per process (``PYTHONHASHSEED``), which
+    would make embeddings differ between runs. A fixed digest keeps the store
+    genuinely deterministic and reproducible.
+    """
+    digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "big") % dim
 
 
 class InMemoryVectorStore(Memory):
@@ -34,7 +46,7 @@ class InMemoryVectorStore(Memory):
         """Hash tokens into a fixed-dimension, L2-normalized term-frequency vector."""
         vector = [0.0] * self._dim
         for token in _tokenize(text):
-            vector[hash(token) % self._dim] += 1.0
+            vector[_stable_bucket(token, self._dim)] += 1.0
         norm = math.sqrt(sum(component * component for component in vector))
         if norm > 0:
             vector = [component / norm for component in vector]

@@ -14,6 +14,9 @@ productive fast.
   side effects must be marked `dangerous=True` so the sandbox gates them.
 - **No secrets, ever.** Don't log API keys or PII; route sensitive values through
   the redactor.
+- **Pass code review.** Every change is reviewed against the
+  [Code Review checklist](docs/CODE_REVIEW.md) before it merges — run it on your
+  own diff first.
 
 ## Development setup
 
