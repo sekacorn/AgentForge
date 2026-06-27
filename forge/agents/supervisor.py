@@ -67,11 +67,13 @@ class Supervisor(BaseAgent):
 
         # 1) Plan.
         plan = await self._plan(goal)
-        ctx.events.emit(
-            EventType.PLAN_CREATED, run_id=ctx.run_id, agent=self.name, subtasks=plan
-        )
+        ctx.events.emit(EventType.PLAN_CREATED, run_id=ctx.run_id, agent=self.name, subtasks=plan)
         ctx.audit.record(
-            "plan.created", actor=self.name, run_id=ctx.run_id, subtask_count=len(plan), subtasks=plan
+            "plan.created",
+            actor=self.name,
+            run_id=ctx.run_id,
+            subtask_count=len(plan),
+            subtasks=plan,
         )
 
         # 2) Delegate each subtask to a fresh worker.

@@ -64,9 +64,7 @@ class ToolSandbox:
         """
         allowed, reason = self.is_allowed(tool)
         if not allowed:
-            self._emit(
-                EventType.SECURITY_VIOLATION, run_id, agent, tool=tool.name, reason=reason
-            )
+            self._emit(EventType.SECURITY_VIOLATION, run_id, agent, tool=tool.name, reason=reason)
             return ToolResult(
                 tool_call_id=call.id,
                 name=call.name,

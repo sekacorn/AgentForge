@@ -141,7 +141,10 @@ class ForgeConfig(BaseModel):
     def _apply_environment(self) -> None:
         """Overlay environment variables onto this config in place."""
         # Provider API keys (conventional names take priority).
-        for provider, env_name in (("anthropic", "ANTHROPIC_API_KEY"), ("openai", "OPENAI_API_KEY")):
+        for provider, env_name in (
+            ("anthropic", "ANTHROPIC_API_KEY"),
+            ("openai", "OPENAI_API_KEY"),
+        ):
             value = os.environ.get(env_name)
             if value:
                 self.api_keys[provider] = value

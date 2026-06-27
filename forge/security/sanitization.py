@@ -23,10 +23,23 @@ _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 # operators can audit and extend it.
 _INJECTION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("override_instructions", re.compile(r"\bignore\s+(all\s+)?(previous|prior|above)\b", re.I)),
-    ("disregard_instructions", re.compile(r"\bdisregard\s+(the\s+)?(above|previous|system)\b", re.I)),
-    ("reveal_system_prompt", re.compile(r"\b(reveal|print|show|repeat)\b.{0,30}\b(system\s+prompt|instructions)\b", re.I)),
+    (
+        "disregard_instructions",
+        re.compile(r"\bdisregard\s+(the\s+)?(above|previous|system)\b", re.I),
+    ),
+    (
+        "reveal_system_prompt",
+        re.compile(
+            r"\b(reveal|print|show|repeat)\b.{0,30}\b(system\s+prompt|instructions)\b", re.I
+        ),
+    ),
     ("role_override", re.compile(r"\byou\s+are\s+now\b", re.I)),
-    ("exfiltrate_secrets", re.compile(r"\b(api[_\s-]?key|password|secret|token)s?\b.{0,20}\b(reveal|send|print|leak)\b", re.I)),
+    (
+        "exfiltrate_secrets",
+        re.compile(
+            r"\b(api[_\s-]?key|password|secret|token)s?\b.{0,20}\b(reveal|send|print|leak)\b", re.I
+        ),
+    ),
     ("developer_mode", re.compile(r"\b(developer|god|jailbreak|DAN)\s+mode\b", re.I)),
 ]
 

@@ -100,9 +100,13 @@ class AnthropicProvider(ModelProvider):
         try:
             response = await self._client.messages.create(**request)
         except self._anthropic.AuthenticationError as exc:
-            raise ProviderAuthError("Anthropic authentication failed", context={"model": model}) from exc
+            raise ProviderAuthError(
+                "Anthropic authentication failed", context={"model": model}
+            ) from exc
         except self._anthropic.RateLimitError as exc:
-            raise ProviderRateLimitError("Anthropic rate limit hit", context={"model": model}) from exc
+            raise ProviderRateLimitError(
+                "Anthropic rate limit hit", context={"model": model}
+            ) from exc
         except self._anthropic.APIError as exc:
             raise ProviderResponseError(
                 f"Anthropic API error: {exc}", context={"model": model}

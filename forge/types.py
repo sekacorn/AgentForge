@@ -58,9 +58,7 @@ class ToolSchema(BaseModel):
 
     name: str
     description: str
-    parameters: dict[str, Any] = Field(
-        default_factory=lambda: {"type": "object", "properties": {}}
-    )
+    parameters: dict[str, Any] = Field(default_factory=lambda: {"type": "object", "properties": {}})
 
 
 class ToolCall(BaseModel):
@@ -107,9 +105,7 @@ class Message(BaseModel):
         return cls(role=Role.USER, content=content)
 
     @classmethod
-    def assistant(
-        cls, content: str = "", tool_calls: list[ToolCall] | None = None
-    ) -> Message:
+    def assistant(cls, content: str = "", tool_calls: list[ToolCall] | None = None) -> Message:
         return cls(role=Role.ASSISTANT, content=content, tool_calls=tool_calls or [])
 
     @classmethod

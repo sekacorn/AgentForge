@@ -95,8 +95,8 @@ class Orchestrator:
         self.sanitizer = InputSanitizer(self.config.security)
         self.access = access or AccessController()
         self.principal = principal or Principal.system()
-        self.default_tools = self._resolve_tools(tools) if tools is not None else ToolRegistry(
-            list(SAFE_TOOLS)
+        self.default_tools = (
+            self._resolve_tools(tools) if tools is not None else ToolRegistry(list(SAFE_TOOLS))
         )
 
         self._log.info(

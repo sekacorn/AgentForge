@@ -127,9 +127,7 @@ class EchoProvider(ModelProvider):
 
     @staticmethod
     def _already_used_calculator(convo: list[Message]) -> bool:
-        return any(
-            tc.name == "calculator" for m in convo for tc in m.tool_calls
-        )
+        return any(tc.name == "calculator" for m in convo for tc in m.tool_calls)
 
     @staticmethod
     def _synthesize(results: list[ToolResult]) -> str:

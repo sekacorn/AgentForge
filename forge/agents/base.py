@@ -58,7 +58,9 @@ class BaseAgent(abc.ABC):
         self.tools = tools
         self.complexity = complexity
         self.model_override = model_override
-        self.max_steps = max_steps if max_steps is not None else ctx.config.budget.max_steps_per_agent
+        self.max_steps = (
+            max_steps if max_steps is not None else ctx.config.budget.max_steps_per_agent
+        )
         self.max_tokens = max_tokens
 
     @abc.abstractmethod

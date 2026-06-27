@@ -27,9 +27,7 @@ def make_event_renderer(console: Console):  # type: ignore[no-untyped-def]
         elif event.type is EventType.AGENT_STARTED:
             console.print(f"[cyan]{event.agent}[/] started")
         elif event.type is EventType.AGENT_FINISHED:
-            console.print(
-                f"[green]{event.agent} finished[/] [dim](steps={data.get('steps')})[/]"
-            )
+            console.print(f"[green]{event.agent} finished[/] [dim](steps={data.get('steps')})[/]")
         elif event.type is EventType.AGENT_FAILED:
             console.print(f"[red]{event.agent} failed[/] [dim]({data.get('reason')})[/]")
         elif event.type is EventType.MODEL_ROUTED:
