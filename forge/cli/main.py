@@ -25,11 +25,11 @@ from forge.orchestration.orchestrator import Orchestrator
 
 
 def _ensure_utf8() -> None:
-    """Force UTF-8 on stdout/stderr so rich glyphs render on Windows consoles.
+    """Force UTF-8 on stdout/stderr so rich output renders on Windows consoles.
 
-    The legacy Windows code page (cp1252) cannot encode characters like '✓',
-    which would otherwise crash rendering. Reconfiguring to UTF-8 is safe and a
-    no-op on platforms that are already UTF-8.
+    The legacy Windows code page (cp1252) cannot encode the box-drawing
+    characters rich uses for tables and panels, which would otherwise crash
+    rendering. Reconfiguring to UTF-8 is safe and a no-op where already UTF-8.
     """
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
@@ -114,7 +114,7 @@ def models() -> None:
             f"{info.context_window:,}",
             f"${info.input_cost_per_mtok:g}",
             f"${info.output_cost_per_mtok:g}",
-            "✓" if info.supports_tools else "—",
+            "yes" if info.supports_tools else "no",
         )
     console.print(table)
 
@@ -126,9 +126,9 @@ def audit() -> None:
     orchestrator = Orchestrator(config)
     ok = orchestrator.verify_audit()
     if ok:
-        console.print(f"[green]✓ audit log intact[/] [dim]({config.compliance.audit_path})[/]")
+        console.print(f"[green]audit log intact[/] [dim]({config.compliance.audit_path})[/]")
     else:
-        console.print("[bold red]✗ audit log integrity check FAILED[/]")
+        console.print("[bold red]audit log integrity check FAILED[/]")
         raise typer.Exit(code=1)
 
 

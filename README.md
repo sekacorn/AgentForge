@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔨 Forge
+# Forge
 
 ### The open-source multi-agent orchestration platform for teams that ship.
 
@@ -67,13 +67,13 @@ asyncio.run(main())
 
 ## Key features
 
-### 🧭 Multi-agent orchestration
+### Multi-agent orchestration
 - **Supervisor + dynamic workers.** A supervisor breaks a goal into independent
   subtasks and spawns a focused worker agent for each, then synthesizes the result.
 - **Real agentic loop.** Workers reason, call tools, observe results, and iterate
   until done — with a hard step budget so they never spin forever.
 
-### 💸 Intelligent routing & cost optimization
+### Intelligent routing & cost optimization
 - **Capability/price-aware router** with `cost_optimized`, `quality_first`,
   `balanced`, and `fixed` strategies.
 - **One pricing source of truth.** The model registry knows real list pricing
@@ -81,7 +81,7 @@ asyncio.run(main())
 - **Budgets that bite.** Per-run USD and token caps halt a runaway before the next
   expensive call.
 
-### 🧰 Tools, memory & RAG — extensible by design
+### Tools, memory & RAG — extensible by design
 - **`@tool` decorator** turns any typed Python function into an agent tool, with
   JSON-Schema generated automatically from your type hints and docstring.
 - **Pluggable memory.** Short-term conversation memory plus a dependency-free
@@ -89,21 +89,21 @@ asyncio.run(main())
 - **Provider-agnostic core.** Anthropic (Claude) and a deterministic offline
   provider ship in the box; add any provider by implementing one method.
 
-### 🔒 Security from the start
+### Security from the start
 - **Tool sandboxing** with allowlists/denylists, per-tool timeouts, and
   **dangerous (network/filesystem) tools denied unless explicitly allowed**.
 - **Prompt-injection heuristics** and input normalization on untrusted goals.
 - **RBAC** — map your IdP groups onto roles and gate who can run agents or use
   dangerous tools.
 
-### 📜 Compliance & governance
+### Compliance & governance
 - **Tamper-evident audit log.** Every model call, tool call, plan, and decision is
   written to an append-only, **SHA-256 hash-chained** JSONL trail. Edits break the
   chain — and `forge audit` detects it.
 - **PII redaction** of logs and audit records (emails, cards, SSNs, IPs, phones).
 - **Data-residency & retention** hints recorded on every entry for GDPR/SOC 2 stories.
 
-### 🔭 Observability built in
+### Observability built in
 - A structured **event bus** emits every lifecycle moment (routing, model calls,
   tool calls, budget thresholds, security violations).
 - **Structured logging** (human or JSON) and a per-run **usage/cost report**.
