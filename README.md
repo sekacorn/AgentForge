@@ -7,6 +7,7 @@
 **Build, run, optimize, and govern teams of AI agents for real business workflows —
 with cost-awareness, security, and compliance built in from line one.**
 
+[![CI](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml/badge.svg)](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
