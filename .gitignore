@@ -1,0 +1,81 @@
+# ---------------------------------------------------------------------------
+# Assistant / Claude Code working files — never commit these.
+# ---------------------------------------------------------------------------
+.claude/
+.claude.json
+CLAUDE.md
+CLAUDE.local.md
+*.claude
+.cursor/
+.aider*
+
+# ---------------------------------------------------------------------------
+# Forge runtime artifacts
+# ---------------------------------------------------------------------------
+# Local audit logs, traces and exported usage reports.
+audit/
+*.audit.jsonl
+.forge/
+forge.local.toml
+
+# ---------------------------------------------------------------------------
+# Secrets — keep API keys out of the repository.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Test / coverage / typing caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.hypothesis/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db

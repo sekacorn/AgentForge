@@ -1,0 +1,123 @@
+# ---------------------------------------------------------------------------
+# Forge (AgentForge) — packaging & tooling configuration
+# ---------------------------------------------------------------------------
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentforge"
+dynamic = ["version"]
+description = "Forge — an open-source, enterprise-ready multi-agent orchestration platform with cost awareness, governance, and security built in."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Sekacorn", email = "Sekacorn@gmail.com" }]
+maintainers = [{ name = "Sekacorn", email = "Sekacorn@gmail.com" }]
+keywords = [
+    "agents",
+    "multi-agent",
+    "orchestration",
+    "llm",
+    "ai",
+    "anthropic",
+    "claude",
+    "openai",
+    "rag",
+    "observability",
+    "governance",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+
+# Core dependencies are intentionally minimal to keep the supply-chain surface
+# small. Provider SDKs (anthropic, openai) are optional extras and are imported
+# lazily so the core remains usable with the built-in providers alone.
+dependencies = [
+    "pydantic>=2.6",
+    "httpx>=0.27",
+    "typing-extensions>=4.10",
+    "rich>=13.7",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.40"]
+all = ["anthropic>=0.40", "openai>=1.40"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "mypy>=1.10",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+forge = "forge.cli.main:app"
+
+[project.urls]
+Homepage = "https://github.com/agentforge/forge"
+Documentation = "https://github.com/agentforge/forge#readme"
+Repository = "https://github.com/agentforge/forge"
+Issues = "https://github.com/agentforge/forge/issues"
+
+[tool.hatch.version]
+path = "forge/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["forge"]
+
+[tool.hatch.build.targets.sdist]
+include = ["forge", "README.md", "LICENSE", "examples", "tests"]
+
+# ---------------------------------------------------------------------------
+# Ruff — linting & formatting
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["forge", "tests", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP", "SIM", "C4", "ASYNC"]
+ignore = ["E501"]  # line length is handled by the formatter
+
+[tool.ruff.lint.isort]
+known-first-party = ["forge"]
+
+# ---------------------------------------------------------------------------
+# mypy — static typing
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["anthropic.*", "openai.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+asyncio_mode = "auto"
