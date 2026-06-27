@@ -69,10 +69,10 @@ dev = [
 forge = "forge.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/agentforge/forge"
-Documentation = "https://github.com/agentforge/forge#readme"
-Repository = "https://github.com/agentforge/forge"
-Issues = "https://github.com/agentforge/forge/issues"
+Homepage = "https://github.com/sekacorn/AgentForge"
+Documentation = "https://github.com/sekacorn/AgentForge#readme"
+Repository = "https://github.com/sekacorn/AgentForge"
+Issues = "https://github.com/sekacorn/AgentForge/issues"
 
 [tool.hatch.version]
 path = "forge/_version.py"

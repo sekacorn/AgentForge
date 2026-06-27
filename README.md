@@ -310,8 +310,8 @@ Common environment variables: `ANTHROPIC_API_KEY`, `FORGE_DEFAULT_MODEL`,
 ## Development
 
 ```bash
-git clone https://github.com/agentforge/forge
-cd forge
+git clone https://github.com/sekacorn/AgentForge.git
+cd AgentForge
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[all,dev]"
 
