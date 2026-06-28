@@ -218,10 +218,10 @@ governance (RBAC + budgets + audit verification).
               │                          │
               │      ┌───────────────────┴───────────────┐
               ▼      ▼                                    ▼
-       ┌────────────────┐                        ┌──────────────────┐
-       │  Model Router  │  picks model by        │  Model Providers │
-       │ cost / quality │  strategy + budget ───▶│ Anthropic · Echo │
-       └───────┬────────┘                        └──────────────────┘
+       ┌────────────────┐                        ┌───────────────────────────┐
+       │  Model Router  │  picks model by        │  Model Providers          │
+       │ cost / quality │  strategy + budget ───▶│ Anthropic · OpenAI · Echo │
+       └───────┬────────┘                        └───────────────────────────┘
                │ pricing
                ▼
        ┌────────────────┐   cross-cutting, on every step:
@@ -233,7 +233,7 @@ Every layer is swappable:
 
 | Layer | Default | Swap in… |
 |---|---|---|
-| Provider | Echo (offline), Anthropic | Any `ModelProvider` (OpenAI, local, Bedrock, …) |
+| Provider | Echo (offline), Anthropic, OpenAI | Any `ModelProvider` (local, Bedrock, Vertex, …) |
 | Routing | `balanced` strategy | Your own strategy / `fixed` model |
 | Memory | In-memory vector store | Any `Memory` backend (pgvector, Pinecone, …) |
 | Tools | `calculator`, `utc_now` | Any `@tool` function |
@@ -333,10 +333,11 @@ hermetic, and free.
 
 ## Roadmap
 
+- [x] First-party OpenAI provider (gpt-4o-mini, gpt-4o, gpt-4.1, o3)
+- [x] Parallel worker execution with pre-flight budget cap and graceful failure handling
 - [ ] Streaming token output through the event bus
-- [ ] First-party OpenAI / Bedrock / local (Ollama) providers
-- [ ] Durable memory backends (pgvector, Redis, object storage)
-- [ ] Parallel worker execution & inter-agent messaging
+- [ ] Durable memory backends (pgvector, Redis, SQLite-VSS)
+- [ ] Local (Ollama) and Amazon Bedrock providers
 - [ ] OpenTelemetry export for traces and metrics
 - [ ] Policy-as-code for tool governance
 - [ ] Hosted SaaS control plane (TypeScript / Next.js) — Python core first
