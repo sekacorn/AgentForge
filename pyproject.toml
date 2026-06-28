@@ -6,7 +6,7 @@ requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentforge"
+name = "agentforge-oss"
 version = "0.1.0"
 description = "Forge — an open-source, enterprise-ready multi-agent orchestration platform with cost awareness, governance, and security built in."
 readme = "README.md"

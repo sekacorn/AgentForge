@@ -120,4 +120,4 @@ def test_missing_sdk_raises_helpful_importerror(monkeypatch):
         OpenAIProvider(api_key="sk-test")
     message = str(exc_info.value)
     assert "openai" in message.lower()
-    assert "agentforge[openai]" in message
+    assert "agentforge-oss[openai]" in message

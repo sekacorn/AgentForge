@@ -8,7 +8,7 @@
 with cost-awareness, security, and compliance built in from line one.**
 
 [![CI](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml/badge.svg)](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/agentforge.svg)](https://pypi.org/project/agentforge/)
+[![PyPI](https://img.shields.io/pypi/v/agentforge-oss.svg)](https://pypi.org/project/agentforge-oss/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
@@ -115,9 +115,9 @@ asyncio.run(main())
 ## Install
 
 ```bash
-pip install agentforge            # core (works offline, zero config)
-pip install "agentforge[anthropic]"   # + Claude provider
-pip install "agentforge[all,dev]"     # everything + test/lint tooling
+pip install agentforge-oss               # core (works offline, zero config)
+pip install "agentforge-oss[anthropic]"  # + Claude provider
+pip install "agentforge-oss[all,dev]"    # everything + test/lint tooling
 ```
 
 > Forge runs **fully offline** out of the box using a deterministic provider, so you

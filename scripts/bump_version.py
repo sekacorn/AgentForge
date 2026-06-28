@@ -75,7 +75,7 @@ def bump(version: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Bump the Forge (agentforge) version.")
+    parser = argparse.ArgumentParser(description="Bump the Forge (agentforge-oss) version.")
     parser.add_argument("version", help="New version, e.g. 0.2.0")
     args = parser.parse_args(argv)
     bump(args.version)

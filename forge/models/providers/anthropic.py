@@ -4,7 +4,7 @@ Uses the official ``anthropic`` Python SDK (the ``AsyncAnthropic`` client). The
 SDK is an *optional* dependency: it is imported lazily so the core library and
 the offline ``EchoProvider`` work without it. Install with::
 
-    pip install "agentforge[anthropic]"
+    pip install "agentforge-oss[anthropic]"
 
 This provider targets the Messages API and the current Claude family. It follows
 the modern request surface for Opus 4.x / Sonnet 4.6 / Fable 5: no sampling
@@ -54,7 +54,7 @@ class AnthropicProvider(ModelProvider):
         except ImportError as exc:  # pragma: no cover - exercised only without the extra
             raise ProviderError(
                 "The 'anthropic' package is required for AnthropicProvider. "
-                "Install it with: pip install 'agentforge[anthropic]'"
+                "Install it with: pip install 'agentforge-oss[anthropic]'"
             ) from exc
 
         self._anthropic = anthropic

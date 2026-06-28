@@ -4,7 +4,7 @@ Uses the official ``openai`` Python SDK (the ``AsyncOpenAI`` client). The SDK is
 an *optional* dependency: it is imported lazily inside ``__init__`` so the core
 library and the offline ``EchoProvider`` work without it. Install with::
 
-    pip install "agentforge[openai]"
+    pip install "agentforge-oss[openai]"
 
 This provider targets the Chat Completions API. Forge ``Message`` types are
 mapped to OpenAI's message format, ``ToolSchema`` is mapped to OpenAI function
@@ -53,7 +53,7 @@ class OpenAIProvider(ModelProvider):
         except ImportError as exc:  # pragma: no cover - exercised only without the extra
             raise ImportError(
                 "The 'openai' package is required for OpenAIProvider. "
-                "Install it with: pip install 'agentforge[openai]'"
+                "Install it with: pip install 'agentforge-oss[openai]'"
             ) from exc
 
         self._openai = openai
