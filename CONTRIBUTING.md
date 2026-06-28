@@ -77,3 +77,28 @@ project for contributors of every background and experience level.
 
 By contributing, you agree that your contributions are licensed under the
 project's [MIT License](LICENSE).
+
+## Release process
+
+Releases are published to PyPI automatically by GitHub Actions using a
+[PyPI Trusted Publisher](https://docs.pypi.org/trusted-publishers/) (OIDC) — no
+API tokens are stored anywhere. To cut a release:
+
+1. Bump the version (updates `pyproject.toml` and `forge/_version.py`):
+   ```bash
+   python scripts/bump_version.py X.Y.Z
+   ```
+2. Commit the bump:
+   ```bash
+   git commit -m "chore: bump version to X.Y.Z"
+   ```
+3. Tag the release:
+   ```bash
+   git tag vX.Y.Z
+   ```
+4. Push the commit and the tag:
+   ```bash
+   git push && git push --tags
+   ```
+5. The `Release` workflow builds the package and publishes it to PyPI
+   automatically via Trusted Publisher.

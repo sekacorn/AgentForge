@@ -7,12 +7,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentforge"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Forge — an open-source, enterprise-ready multi-agent orchestration platform with cost awareness, governance, and security built in."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
-license-files = ["LICENSE"]
+license = { text = "MIT" }
 authors = [{ name = "Sekacorn", email = "Sekacorn@gmail.com" }]
 maintainers = [{ name = "Sekacorn", email = "Sekacorn@gmail.com" }]
 keywords = [
@@ -27,6 +26,7 @@ keywords = [
     "rag",
     "observability",
     "governance",
+    "enterprise",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -39,6 +39,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
 
@@ -73,9 +74,6 @@ Homepage = "https://github.com/sekacorn/AgentForge"
 Documentation = "https://github.com/sekacorn/AgentForge#readme"
 Repository = "https://github.com/sekacorn/AgentForge"
 Issues = "https://github.com/sekacorn/AgentForge/issues"
-
-[tool.hatch.version]
-path = "forge/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["forge"]
