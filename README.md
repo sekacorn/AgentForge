@@ -12,7 +12,7 @@ with cost-awareness, security, and compliance built in from line one.**
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#roadmap)
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v010)
 
 </div>
 
@@ -40,17 +40,50 @@ import asyncio
 from forge import Orchestrator
 
 async def main() -> None:
-    # Zero config. Runs fully offline with the deterministic echo provider,
-    # and automatically uses Claude when ANTHROPIC_API_KEY is set.
+    # Zero config. Runs fully offline with the deterministic echo provider, and
+    # automatically uses Claude or GPT when an API key is present in the environment.
     async with Orchestrator() as forge:
         result = await forge.run(
-            "Draft an outreach email to a prospect and compute a 12% discount on $4,200"
+            "Research our top 3 competitors, draft a comparison, and compute Q3 growth at 18%",
+            mode="supervisor",   # spawns parallel workers, one per subtask
         )
         print(result.output)
-        print(result.usage.format_table())   # tokens + dollars, per model and per agent
+        print(result.usage.format_table())   # tokens + cost, per model and per agent
 
 asyncio.run(main())
 ```
+
+---
+
+## What's shipped (v0.1.0)
+
+An honest snapshot of what works today versus what is on the way. Everything marked
+**Shipped** is implemented, typed, and covered by the test suite.
+
+| Feature | Status |
+|---|---|
+| Multi-agent orchestration (supervisor + parallel workers) | Shipped |
+| Intelligent model routing (`cost_optimized`, `quality_first`, `balanced`, `fixed`) | Shipped |
+| Anthropic provider (Claude Haiku 4.5, Sonnet 4.6, Opus 4.8, Fable 5) | Shipped |
+| OpenAI provider (gpt-4o-mini, gpt-4o, gpt-4.1, o3) | Shipped |
+| Offline deterministic provider (zero config, no API key) | Shipped |
+| Pre-flight + per-step budget caps | Shipped |
+| Tool sandboxing (allowlist/denylist, timeouts, dangerous-denied-by-default) | Shipped |
+| RBAC (admin / operator / developer / viewer) | Shipped |
+| Prompt-injection heuristics + input sanitization | Shipped |
+| SHA-256 hash-chained tamper-evident audit log | Shipped |
+| PII redaction (emails, cards, SSNs, IPs, phones) | Shipped |
+| Event bus (18 lifecycle event types) | Shipped |
+| Per-run cost reporting (tokens + USD, per model, per agent) | Shipped |
+| Conversation memory + in-memory RAG vector store | Shipped |
+| CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
+| 42 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
+| Streaming token output through the event bus | Next |
+| Durable memory backends (pgvector, SQLite-VSS) | Planned |
+| OpenTelemetry export for traces and metrics | Planned |
+| Ollama / Bedrock / Vertex providers | Planned |
+| Policy-as-code for tool governance | Planned |
+| Hosted SaaS control plane (TypeScript / Next.js) | Future |
 
 ---
 
@@ -59,6 +92,7 @@ asyncio.run(main())
 | Without Forge | With Forge |
 |---|---|
 | One prompt, one answer, no division of labor | A supervisor decomposes the goal and delegates to specialized workers |
+| Workers run one at a time | Workers run in parallel — with a pre-flight budget check before any of them start |
 | Every call hits your most expensive model | Intelligent routing sends easy work to cheap models, hard work to frontier models |
 | Cost is a surprise on the invoice | Cost is tracked per run, per agent, per model — with hard budget caps |
 | Tools run with full trust | Tools run sandboxed, with side-effecting tools **denied by default** |
@@ -72,31 +106,41 @@ asyncio.run(main())
 ### Multi-agent orchestration
 - **Supervisor + dynamic workers.** A supervisor breaks a goal into independent
   subtasks and spawns a focused worker agent for each, then synthesizes the result.
+- **True parallelism.** Workers run concurrently via `asyncio.gather` in bounded
+  batches. A configurable `max_workers` cap (default 5) keeps fan-out under control,
+  so the supervisor never blocks on one worker while others could be progressing.
+- **Graceful failure isolation.** A crashing worker emits `WORKER_FAILED`, records the
+  error to the audit log, and returns a partial result — its peers are never
+  cancelled, and the run completes with everything that succeeded.
 - **Real agentic loop.** Workers reason, call tools, observe results, and iterate
   until done — with a hard step budget so they never spin forever.
 
 ### Intelligent routing & cost optimization
 - **Capability/price-aware router** with `cost_optimized`, `quality_first`,
   `balanced`, and `fixed` strategies.
-- **One pricing source of truth.** The model registry knows real list pricing
-  (Claude Opus 4.8, Sonnet 4.6, Haiku 4.5, Fable 5) and computes spend consistently.
-- **Budgets that bite.** Per-run USD and token caps halt a runaway before the next
-  expensive call.
+- **One pricing source of truth.** The model registry knows real list pricing across
+  all providers (Claude Haiku 4.5, Sonnet 4.6, Opus 4.8, Fable 5; GPT-4o-mini, GPT-4o,
+  GPT-4.1, o3) and computes spend consistently.
+- **Budgets that bite — twice.** A pessimistic *pre-flight* check estimates the
+  worst-case spend of a worker batch and refuses to start it if that would blow the
+  remaining budget. A precise, real-time check then fires after every model call.
+  Together they bound both over-spend and wasted API calls.
 
 ### Tools, memory & RAG — extensible by design
 - **`@tool` decorator** turns any typed Python function into an agent tool, with
   JSON-Schema generated automatically from your type hints and docstring.
 - **Pluggable memory.** Short-term conversation memory plus a dependency-free
   in-memory vector store for RAG — swap in any backend behind one tiny interface.
-- **Provider-agnostic core.** Anthropic (Claude) and a deterministic offline
-  provider ship in the box; add any provider by implementing one method.
+- **Provider-agnostic core.** Anthropic (Claude) and OpenAI (GPT / o-series) ship in
+  the box alongside a deterministic offline echo provider; add any provider by
+  implementing one method.
 
 ### Security from the start
 - **Tool sandboxing** with allowlists/denylists, per-tool timeouts, and
   **dangerous (network/filesystem) tools denied unless explicitly allowed**.
 - **Prompt-injection heuristics** and input normalization on untrusted goals.
-- **RBAC** — map your IdP groups onto roles and gate who can run agents or use
-  dangerous tools.
+- **RBAC** — map your IdP groups onto roles (`admin`, `operator`, `developer`,
+  `viewer`) and gate who can run agents or use dangerous tools.
 
 ### Compliance & governance
 - **Tamper-evident audit log.** Every model call, tool call, plan, and decision is
@@ -106,27 +150,34 @@ asyncio.run(main())
 - **Data-residency & retention** hints recorded on every entry for GDPR/SOC 2 stories.
 
 ### Observability built in
-- A structured **event bus** emits every lifecycle moment (routing, model calls,
-  tool calls, budget thresholds, security violations).
-- **Structured logging** (human or JSON) and a per-run **usage/cost report**.
+- A structured **event bus** emits **18 distinct lifecycle event types** — run, agent,
+  and worker start/finish (including `WORKER_STARTED` and `WORKER_FAILED` for parallel
+  execution), model routing and calls, tool calls, budget thresholds, and security
+  violations — so any subscriber (console, audit, metrics) sees the same stream.
+- **Structured logging** (human or JSON) and a per-run **usage/cost report** broken
+  down per model and per agent.
 
 ---
 
 ## Install
 
 ```bash
-pip install agentforge-oss               # core (works offline, zero config)
-pip install "agentforge-oss[anthropic]"  # + Claude provider
-pip install "agentforge-oss[all,dev]"    # everything + test/lint tooling
+pip install agentforge-oss                       # core (works offline, zero config)
+pip install "agentforge-oss[anthropic]"          # + Claude provider
+pip install "agentforge-oss[openai]"             # + OpenAI / GPT provider
+pip install "agentforge-oss[anthropic,openai]"   # both real providers
+pip install "agentforge-oss[all,dev]"            # everything + test/lint tooling
 ```
 
-> **Note:** The PyPI package is `agentforge-oss` — so `pip install agentforge-oss`.  
-> The import is still `import forge`. This follows the same convention as  
-> `pip install Pillow` → `import PIL`.
+> **Note:** The PyPI package is `agentforge-oss` — so `pip install agentforge-oss`.
+> The import is still `import forge`. This follows the same convention as
+> `pip install Pillow` then `import PIL`.
 
-> Forge runs **fully offline** out of the box using a deterministic provider, so you
-> can explore the whole platform — routing, tools, supervision, audit — without an
-> API key. Set `ANTHROPIC_API_KEY` to route to Claude automatically.
+> Forge runs **fully offline** out of the box using a deterministic echo provider, so
+> you can explore the whole platform — routing, tools, supervision, audit — without an
+> API key. Set `ANTHROPIC_API_KEY` to route automatically to Claude, or `OPENAI_API_KEY`
+> to route to GPT. Both keys can be set at once; Forge prefers Anthropic by default
+> (configurable).
 
 ---
 
@@ -179,6 +230,25 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+### Parallel supervisor — workers run concurrently, one per subtask
+
+```python
+import asyncio
+from forge import Orchestrator, ForgeConfig, BudgetConfig
+
+async def main() -> None:
+    config = ForgeConfig(budget=BudgetConfig(max_workers=3, max_usd_per_run=0.25))
+    async with Orchestrator(config) as forge:
+        result = await forge.run(
+            "Summarize our product, draft a pricing page, and write an FAQ",
+            mode="supervisor",
+        )
+        print(result.output)
+        print(result.usage.format_table())
+
+asyncio.run(main())
+```
+
 ### Retrieval-augmented generation (RAG), offline
 
 ```python
@@ -211,9 +281,9 @@ governance (RBAC + budgets + audit verification).
               ┌──────────────────────────┼───────────────────────────┐
               ▼                          ▼                           ▼
       ┌───────────────┐         ┌─────────────────┐          ┌──────────────┐
-      │  Supervisor   │ spawns  │   Worker Agent  │  calls   │ Tool Sandbox │
+      │  Supervisor   │ spawns  │   Worker Agents │  call    │ Tool Sandbox │
       │  plan→delegate│────────▶│  reason ↔ act   │─────────▶│ allow/deny + │
-      │  →synthesize  │         │   (agentic loop)│          │  timeouts    │
+      │  →synthesize  │ (gather)│  (parallel loop)│          │  timeouts    │
       └───────┬───────┘         └────────┬────────┘          └──────────────┘
               │                          │
               │      ┌───────────────────┴───────────────┐
@@ -306,9 +376,9 @@ redact_pii = true
 data_region = "eu-west-1"
 ```
 
-Common environment variables: `ANTHROPIC_API_KEY`, `FORGE_DEFAULT_MODEL`,
-`FORGE_ROUTING_STRATEGY`, `FORGE_MAX_USD_PER_RUN`, `FORGE_LOG_LEVEL`,
-`FORGE_JSON_LOGS`, `FORGE_AUDIT_ENABLED`, `FORGE_REDACT_PII`. See
+Common environment variables: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`FORGE_DEFAULT_MODEL`, `FORGE_ROUTING_STRATEGY`, `FORGE_MAX_USD_PER_RUN`,
+`FORGE_LOG_LEVEL`, `FORGE_JSON_LOGS`, `FORGE_AUDIT_ENABLED`, `FORGE_REDACT_PII`. See
 [`.env.example`](.env.example).
 
 ---
@@ -326,29 +396,24 @@ ruff check .      # lint
 mypy forge        # strict type-check
 ```
 
-The entire test suite runs offline against the deterministic provider — fast,
-hermetic, and free.
-
----
-
-## Roadmap
-
-- [x] First-party OpenAI provider (gpt-4o-mini, gpt-4o, gpt-4.1, o3)
-- [x] Parallel worker execution with pre-flight budget cap and graceful failure handling
-- [ ] Streaming token output through the event bus
-- [ ] Durable memory backends (pgvector, Redis, SQLite-VSS)
-- [ ] Local (Ollama) and Amazon Bedrock providers
-- [ ] OpenTelemetry export for traces and metrics
-- [ ] Policy-as-code for tool governance
-- [ ] Hosted SaaS control plane (TypeScript / Next.js) — Python core first
+The entire 42-test suite runs offline against the deterministic provider — fast,
+hermetic, and free. CI runs the same checks (ruff, ruff format, mypy strict, pytest)
+on Python 3.11, 3.12, and 3.13.
 
 ---
 
 ## Contributing
 
-Contributions are very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Good first
-areas: new providers, new tools, memory backends, and routing strategies. Please keep
+Contributions are very welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Please keep
 the core typed (`mypy --strict`) and tested.
+
+### Good first contributions
+
+- **New model provider** (Ollama, Bedrock, Vertex) — implement one method.
+- **New built-in tool** (web search, file read, database query).
+- **Durable memory backend** (SQLite-VSS, pgvector, Redis).
+- **Routing strategy** (a custom cost/quality tradeoff).
+- **Example workflows** that show Forge solving a real business problem.
 
 ## License
 
