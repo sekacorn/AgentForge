@@ -61,7 +61,7 @@ from forge.models import (
     ModelTier,
     RoutingDecision,
 )
-from forge.models.providers import AnthropicProvider, EchoProvider
+from forge.models.providers import AnthropicProvider, EchoProvider, OpenAIProvider
 from forge.observability import (
     Event,
     EventBus,
@@ -128,6 +128,7 @@ __all__ = [
     "RoutingDecision",
     "EchoProvider",
     "AnthropicProvider",
+    "OpenAIProvider",
     # Tools
     "Tool",
     "tool",

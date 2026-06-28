@@ -52,6 +52,10 @@ class RoutingConfig(BaseModel):
     planner_model: str | None = None
     #: If set, the router only considers models served by these providers.
     allow_providers: list[str] | None = None
+    #: Preferred provider for routing. When set, the router restricts selection to
+    #: this provider (others act as fallback only). The orchestrator auto-populates
+    #: this from the available API keys when it is not set explicitly.
+    default_provider: str | None = None
 
 
 class BudgetConfig(BaseModel):
@@ -171,3 +175,13 @@ class ForgeConfig(BaseModel):
     def api_key_for(self, provider: str) -> str | None:
         """Return the configured API key for ``provider``, if any."""
         return self.api_keys.get(provider)
+
+    @property
+    def anthropic_api_key(self) -> str | None:
+        """The Anthropic API key, if configured (from ``ANTHROPIC_API_KEY``)."""
+        return self.api_keys.get("anthropic")
+
+    @property
+    def openai_api_key(self) -> str | None:
+        """The OpenAI API key, if configured (from ``OPENAI_API_KEY``)."""
+        return self.api_keys.get("openai")

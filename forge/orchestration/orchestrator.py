@@ -29,6 +29,7 @@ from forge.exceptions import ConfigurationError, ForgeError
 from forge.models.base import ModelProvider
 from forge.models.providers.anthropic import AnthropicProvider
 from forge.models.providers.echo import EchoProvider
+from forge.models.providers.openai import OpenAIProvider
 from forge.models.registry import ModelRegistry
 from forge.models.router import ModelRouter
 from forge.observability.events import Event, EventBus, EventType
@@ -79,6 +80,7 @@ class Orchestrator:
         self.providers = providers if providers is not None else self._build_default_providers()
         if not self.providers:
             raise ConfigurationError("No model providers are configured")
+        self._apply_default_provider()
 
         self.router = ModelRouter(
             self.registry, self.config.routing, available_providers=set(self.providers)
@@ -235,15 +237,42 @@ class Orchestrator:
     # Internals
     # ------------------------------------------------------------------ #
     def _build_default_providers(self) -> dict[str, ModelProvider]:
-        """Always provide the offline echo provider; add Anthropic if keyed."""
+        """Always provide the offline echo provider; add Anthropic/OpenAI if keyed."""
         providers: dict[str, ModelProvider] = {"echo": EchoProvider()}
         anthropic_key = self.config.api_key_for("anthropic")
         if anthropic_key:
             try:
                 providers["anthropic"] = AnthropicProvider(api_key=anthropic_key)
-            except ForgeError as exc:
+            except (ForgeError, ImportError) as exc:
                 self._log.warning("Anthropic provider unavailable: %s", exc)
+        openai_key = self.config.api_key_for("openai")
+        if openai_key:
+            try:
+                providers["openai"] = OpenAIProvider(api_key=openai_key)
+            except (ForgeError, ImportError) as exc:
+                self._log.warning("OpenAI provider unavailable: %s", exc)
         return providers
+
+    def _apply_default_provider(self) -> None:
+        """Choose a default provider so real work is not shadowed by free echo models.
+
+        Precedence: explicit user config > Anthropic > OpenAI > Echo. The chosen
+        provider's cheapest model is used for the lightweight planning pass; echo
+        stays available as the offline fallback.
+        """
+        routing = self.config.routing
+        if routing.default_provider is not None or routing.allow_providers is not None:
+            return  # respect explicit user routing configuration
+        available = set(self.providers)
+        if "anthropic" in available:
+            default_provider, cheapest = "anthropic", "claude-haiku-4-5"
+        elif "openai" in available:
+            default_provider, cheapest = "openai", "gpt-4o-mini"
+        else:
+            return  # echo-only: keep the offline defaults
+        routing.default_provider = default_provider
+        if routing.planner_model is None and self.registry.has(cheapest):
+            routing.planner_model = cheapest
 
     @staticmethod
     def _resolve_tools(tools: ToolRegistry | Iterable[Tool]) -> ToolRegistry:

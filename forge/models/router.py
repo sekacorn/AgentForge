@@ -76,6 +76,12 @@ class ModelRouter:
         if self._config.allow_providers is not None:
             allowed = set(self._config.allow_providers)
             models = [m for m in models if m.provider in allowed]
+        # Prefer the configured default provider when it has usable models, so a
+        # real provider is not shadowed by the free echo models.
+        if self._config.default_provider is not None:
+            preferred = [m for m in models if m.provider == self._config.default_provider]
+            if preferred:
+                models = preferred
         if needs_tools:
             models = [m for m in models if m.supports_tools]
         return models
