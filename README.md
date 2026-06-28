@@ -12,7 +12,7 @@ with cost-awareness, security, and compliance built in from line one.**
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v010)
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v020)
 
 </div>
 
@@ -55,7 +55,7 @@ asyncio.run(main())
 
 ---
 
-## What's shipped (v0.1.0)
+## What's shipped (v0.2.0)
 
 An honest snapshot of what works today versus what is on the way. Everything marked
 **Shipped** is implemented, typed, and covered by the test suite.
