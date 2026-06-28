@@ -66,7 +66,8 @@ class BudgetConfig(BaseModel):
     #: Maximum reasoning/acting iterations a single agent may take.
     max_steps_per_agent: int = 12
     #: Maximum number of dynamic workers a supervisor may spawn for one goal.
-    max_workers: int = 8
+    #: Also bounds parallelism: subtasks run in concurrent batches of this size.
+    max_workers: int = 5
 
 
 class SecurityConfig(BaseModel):

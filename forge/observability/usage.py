@@ -13,6 +13,26 @@ from pydantic import BaseModel, Field
 from forge.types import Usage, utcnow
 
 
+def estimate_worker_batch_cost(
+    *,
+    num_workers: int,
+    input_cost_per_mtok: float,
+    max_steps_per_agent: int,
+    avg_input_tokens_per_step: int = 1000,
+) -> float:
+    """Worst-case USD cost estimate for a batch of parallel workers.
+
+    Deliberately *pessimistic*: it assumes every worker runs its full step budget
+    at ``avg_input_tokens_per_step`` input tokens per step on the routed model's
+    input price. It backs the conservative pre-flight guard run before workers are
+    spawned (see ``RunContext.preflight_budget``); precise, real-time accounting
+    still happens per model call via :class:`UsageTracker` and
+    ``RunContext.check_budget``.
+    """
+    price_per_token = input_cost_per_mtok / 1_000_000
+    return num_workers * max_steps_per_agent * avg_input_tokens_per_step * price_per_token
+
+
 class UsageRecord(BaseModel):
     """A single metered model call."""
 

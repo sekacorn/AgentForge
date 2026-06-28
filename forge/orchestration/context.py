@@ -19,7 +19,7 @@ from forge.models.base import ModelProvider
 from forge.models.registry import ModelRegistry
 from forge.models.router import ModelRouter
 from forge.observability.events import EventBus, EventType
-from forge.observability.usage import UsageTracker
+from forge.observability.usage import UsageTracker, estimate_worker_batch_cost
 from forge.security.sandbox import ToolSandbox
 
 
@@ -92,5 +92,47 @@ class RunContext:
                 context={
                     "spent_tokens": total.total_tokens,
                     "limit_tokens": budget.max_tokens_per_run,
+                },
+            )
+
+    def preflight_budget(self, *, num_workers: int, model_name: str) -> None:
+        """Conservative pre-flight budget guard, run BEFORE a batch of workers spawns.
+
+        Estimates the worst-case spend of the upcoming batch and refuses to start
+        it if that would exceed the remaining USD budget. This is intentionally
+        pessimistic (it assumes every worker uses its full step budget), so under
+        parallelism it errs toward stopping early rather than overspending. The
+        precise, real-time guard remains :meth:`check_budget`, run after every
+        model call inside each worker.
+        """
+        budget = self.config.budget
+        max_usd = budget.max_usd_per_run
+        if max_usd is None:
+            return
+
+        info = self.registry.get(model_name)
+        estimated = estimate_worker_batch_cost(
+            num_workers=num_workers,
+            input_cost_per_mtok=info.input_cost_per_mtok,
+            max_steps_per_agent=budget.max_steps_per_agent,
+        )
+        remaining = max_usd - self.usage.total.cost_usd
+        if estimated > remaining:
+            self.events.emit(
+                EventType.BUDGET_EXCEEDED,
+                run_id=self.run_id,
+                kind="preflight",
+                estimated_usd=round(estimated, 6),
+                remaining_usd=round(remaining, 6),
+                num_workers=num_workers,
+                model=model_name,
+            )
+            raise BudgetExceededError(
+                "Pre-flight budget check: estimated worker-batch spend exceeds remaining budget",
+                context={
+                    "estimated_usd": round(estimated, 6),
+                    "remaining_usd": round(remaining, 6),
+                    "num_workers": num_workers,
+                    "model": model_name,
                 },
             )

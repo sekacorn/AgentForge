@@ -10,8 +10,10 @@ that keep the platform fully functional offline via the echo provider.
 
 from __future__ import annotations
 
+import asyncio
 import re
-from typing import TYPE_CHECKING
+from collections.abc import Coroutine
+from typing import TYPE_CHECKING, Any
 
 from forge.agents.agent import Agent
 from forge.agents.base import AgentResult, BaseAgent
@@ -76,17 +78,8 @@ class Supervisor(BaseAgent):
             subtasks=plan,
         )
 
-        # 2) Delegate each subtask to a fresh worker.
-        children: list[AgentResult] = []
-        for index, subtask in enumerate(plan, start=1):
-            worker = Agent(
-                f"{self.name}.worker-{index}",
-                ctx,
-                system_prompt=self.worker_system_prompt,
-                tools=self.worker_tools,
-                complexity=Complexity.MEDIUM,
-            )
-            children.append(await worker.run(subtask))
+        # 2) Delegate subtasks to workers, running each batch concurrently.
+        children = await self._run_workers(plan)
 
         # 3) Synthesise a final answer and assemble the report.
         summary = await self._synthesize(goal, children)
@@ -107,6 +100,98 @@ class Supervisor(BaseAgent):
             usage=subtree_usage,
             steps=len(plan),
             children=children,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Parallel worker execution
+    # ------------------------------------------------------------------ #
+    async def _run_workers(self, plan: list[str]) -> list[AgentResult]:
+        """Run the planned subtasks as workers, concurrently and in bounded batches.
+
+        Subtasks are processed in batches of at most ``max_workers`` so parallelism
+        stays bounded. Each batch runs under ``asyncio.gather(..., return_exceptions
+        =True)`` so one failing worker never cancels its peers; a failure becomes a
+        graceful, recorded error result instead of crashing the whole run. Results
+        keep their subtask order (``gather`` preserves input order).
+        """
+        ctx = self._ctx
+        # The model a worker will route to — used for the pre-flight budget estimate.
+        worker_model = ctx.router.route(
+            complexity=Complexity.MEDIUM, needs_tools=self.worker_tools is not None
+        ).model
+
+        children: list[AgentResult] = []
+        for start in range(0, len(plan), self.max_workers):
+            batch = plan[start : start + self.max_workers]
+
+            # Pre-flight budget guard: refuse to spawn this batch if its worst-case
+            # spend would blow the remaining budget (raises before any worker runs).
+            ctx.preflight_budget(num_workers=len(batch), model_name=worker_model)
+
+            coroutines: list[Coroutine[Any, Any, AgentResult]] = [
+                self._run_worker(f"{self.name}.worker-{start + offset + 1}", subtask)
+                for offset, subtask in enumerate(batch)
+            ]
+            results: list[AgentResult | BaseException] = await asyncio.gather(
+                *coroutines, return_exceptions=True
+            )
+
+            for offset, result in enumerate(results):
+                worker_id = f"{self.name}.worker-{start + offset + 1}"
+                if isinstance(result, BaseException):
+                    children.append(self._handle_worker_failure(worker_id, batch[offset], result))
+                else:
+                    children.append(result)
+        return children
+
+    async def _run_worker(self, worker_id: str, subtask: str) -> AgentResult:
+        ctx = self._ctx
+        ctx.events.emit(
+            EventType.WORKER_STARTED,
+            run_id=ctx.run_id,
+            agent=self.name,
+            worker_id=worker_id,
+            subtask=subtask,
+        )
+        worker = Agent(
+            worker_id,
+            ctx,
+            system_prompt=self.worker_system_prompt,
+            tools=self.worker_tools,
+            complexity=Complexity.MEDIUM,
+        )
+        return await worker.run(subtask)
+
+    def _handle_worker_failure(
+        self, worker_id: str, subtask: str, error: BaseException
+    ) -> AgentResult:
+        """Turn a worker exception into a recorded, graceful error result."""
+        ctx = self._ctx
+        ctx.events.emit(
+            EventType.WORKER_FAILED,
+            run_id=ctx.run_id,
+            agent=self.name,
+            worker_id=worker_id,
+            subtask=subtask,
+            error=str(error),
+        )
+        ctx.audit.record(
+            "worker.failed",
+            actor=self.name,
+            run_id=ctx.run_id,
+            outcome="error",
+            resource=worker_id,
+            subtask=subtask,
+            error=str(error),
+        )
+        # Preserve any partial spend the worker incurred before it failed.
+        usage = ctx.usage.report().by_agent.get(worker_id, Usage())
+        return AgentResult(
+            agent=worker_id,
+            output=f"[failed] {subtask}: {error}",
+            usage=usage,
+            steps=0,
+            success=False,
         )
 
     # ------------------------------------------------------------------ #
