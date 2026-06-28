@@ -17,7 +17,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from forge import __version__
-from forge.cli.console import make_event_renderer
+from forge.cli.console import make_event_renderer, make_token_renderer
 from forge.config import ForgeConfig
 from forge.exceptions import ForgeError
 from forge.models.registry import ModelRegistry
@@ -62,6 +62,9 @@ def run(
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Stream a live trace of routing, tools and cost."
     ),
+    stream: bool = typer.Option(
+        False, "--stream", help="Stream model output token-by-token as it is generated."
+    ),
     json_output: bool = typer.Option(
         False, "--json", help="Emit the result as JSON instead of formatted text."
     ),
@@ -71,9 +74,11 @@ def run(
     orchestrator = Orchestrator(config)
     if verbose and not json_output:
         orchestrator.subscribe(make_event_renderer(console))
+    if stream and not json_output:
+        orchestrator.subscribe(make_token_renderer())
 
     try:
-        result = orchestrator.run_sync(goal, mode=mode, model=model)
+        result = orchestrator.run_sync(goal, mode=mode, model=model, stream=stream)
     except ForgeError as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc

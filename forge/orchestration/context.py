@@ -36,6 +36,10 @@ class RunContext:
     usage: UsageTracker
     events: EventBus
     audit: AuditLogger
+    #: When True, agents stream model output token-by-token through the event bus
+    #: (TOKEN_STREAM_START / TOKEN_CHUNK / TOKEN_STREAM_END) instead of awaiting the
+    #: whole completion. Defaults to False so the standard path is unchanged.
+    stream: bool = False
 
     def provider_for(self, model_name: str) -> ModelProvider:
         """Resolve the provider instance that serves ``model_name``."""

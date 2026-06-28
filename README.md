@@ -73,12 +73,12 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Prompt-injection heuristics + input sanitization | Shipped |
 | SHA-256 hash-chained tamper-evident audit log | Shipped |
 | PII redaction (emails, cards, SSNs, IPs, phones) | Shipped |
-| Event bus (18 lifecycle event types) | Shipped |
+| Event bus (21 lifecycle event types) | Shipped |
+| Streaming token output through the event bus (`stream=True`) | Shipped |
 | Per-run cost reporting (tokens + USD, per model, per agent) | Shipped |
 | Conversation memory + in-memory RAG vector store | Shipped |
 | CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
-| 42 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
-| Streaming token output through the event bus | Next |
+| 47 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backends (pgvector, SQLite-VSS) | Planned |
 | OpenTelemetry export for traces and metrics | Planned |
 | Ollama / Bedrock / Vertex providers | Planned |
@@ -150,10 +150,14 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 - **Data-residency & retention** hints recorded on every entry for GDPR/SOC 2 stories.
 
 ### Observability built in
-- A structured **event bus** emits **18 distinct lifecycle event types** — run, agent,
+- A structured **event bus** emits **21 distinct lifecycle event types** — run, agent,
   and worker start/finish (including `WORKER_STARTED` and `WORKER_FAILED` for parallel
   execution), model routing and calls, tool calls, budget thresholds, and security
   violations — so any subscriber (console, audit, metrics) sees the same stream.
+- **Token streaming.** Run with `stream=True` and the platform emits
+  `TOKEN_STREAM_START` / `TOKEN_CHUNK` / `TOKEN_STREAM_END` events — each tagged with
+  the agent that produced it, so you can render live output even across parallel
+  workers. `forge run "..." --stream` gives the classic live-typing terminal feel.
 - **Structured logging** (human or JSON) and a per-run **usage/cost report** broken
   down per model and per agent.
 
@@ -186,6 +190,9 @@ pip install "agentforge-oss[all,dev]"            # everything + test/lint toolin
 ```bash
 # Works with no API key — uses the offline provider.
 forge run "Plan a product launch and calculate 15% of 3,400" --verbose
+
+# Stream model output token-by-token as it is generated.
+forge run "Write a short product tagline" --stream
 
 # See the model registry and pricing the router reasons over.
 forge models
@@ -396,7 +403,7 @@ ruff check .      # lint
 mypy forge        # strict type-check
 ```
 
-The entire 42-test suite runs offline against the deterministic provider — fast,
+The entire 47-test suite runs offline against the deterministic provider — fast,
 hermetic, and free. CI runs the same checks (ruff, ruff format, mypy strict, pytest)
 on Python 3.11, 3.12, and 3.13.
 

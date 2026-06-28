@@ -7,6 +7,9 @@ calls, and cost as a run unfolds. Output uses color but no emoji.
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Callable
+
 from rich.console import Console
 
 from forge.observability.events import Event, EventType
@@ -59,5 +62,25 @@ def make_event_renderer(console: Console):  # type: ignore[no-untyped-def]
                 )
             else:
                 console.print(f"[bold red]run failed[/] [dim]{data.get('error')}[/]")
+
+    return render
+
+
+def make_token_renderer() -> Callable[[Event], None]:
+    """Return an event handler that prints streamed tokens to stdout in real time.
+
+    Writes each ``TOKEN_CHUNK`` chunk as it arrives with no trailing newline, then
+    a single newline when the stream ends — the classic live-typing terminal feel.
+    Uses raw ``sys.stdout`` writes (not rich) so token text is never reinterpreted
+    as markup.
+    """
+
+    def render(event: Event) -> None:
+        if event.type is EventType.TOKEN_CHUNK:
+            sys.stdout.write(str(event.data.get("chunk", "")))
+            sys.stdout.flush()
+        elif event.type is EventType.TOKEN_STREAM_END:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
     return render

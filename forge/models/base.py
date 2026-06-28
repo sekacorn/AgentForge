@@ -14,6 +14,8 @@ token usage but **not** dollar cost — pricing lives in the
 from __future__ import annotations
 
 import abc
+from collections.abc import AsyncIterator
+from typing import Any
 
 from forge.types import Message, ModelResponse, Role, ToolSchema
 
@@ -67,6 +69,31 @@ class ModelProvider(abc.ABC):
             Provider-specific passthrough (e.g. ``thinking``).
         """
         raise NotImplementedError
+
+    async def stream(
+        self,
+        messages: list[Message],
+        *,
+        model: str,
+        tools: list[ToolSchema] | None = None,
+        system: str | None = None,
+        max_tokens: int = 4096,
+        **options: Any,
+    ) -> AsyncIterator[str]:
+        """Stream the response as text chunks.
+
+        The default implementation buffers :meth:`complete` and yields the whole
+        content as a single chunk, so *every* provider supports streaming out of
+        the box. Providers that can stream natively (or want finer-grained chunks)
+        should override this and ``yield`` text deltas as they arrive.
+
+        Only text is streamed; tool calls and exact usage are not surfaced here.
+        Callers that need those use :meth:`complete` (the non-streaming path).
+        """
+        response = await self.complete(
+            messages, model=model, tools=tools, system=system, max_tokens=max_tokens, **options
+        )
+        yield response.content
 
     async def aclose(self) -> None:
         """Release any underlying resources (HTTP clients, sockets). Optional."""

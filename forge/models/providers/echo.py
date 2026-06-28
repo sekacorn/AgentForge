@@ -18,7 +18,10 @@ realistically (cost still resolves to $0 because echo models are free-tier).
 
 from __future__ import annotations
 
+import asyncio
 import re
+from collections.abc import AsyncIterator
+from typing import Any
 
 from forge.models.base import ModelProvider, split_system
 from forge.types import (
@@ -42,6 +45,9 @@ _BULLET = re.compile(r"^\s*(?:\d+\.|[-*])\s+", re.MULTILINE)
 
 _ARITHMETIC = re.compile(r"[-+]?\d[\d\s.]*\s*[-+*/]\s*[\d\s.()+\-*/]*\d")
 _SPLIT_PATTERN = re.compile(r"\s+and\s+|\s+then\s+|[;\n]+", re.IGNORECASE)
+
+#: Characters per simulated streaming chunk (small, to exercise multi-chunk streams).
+_STREAM_CHUNK_SIZE = 8
 
 
 def _estimate_tokens(text: str) -> int:
@@ -107,6 +113,31 @@ class EchoProvider(ModelProvider):
         # 5) Default: a concise deterministic acknowledgement.
         content = self._acknowledge(user_text)
         return self._respond(model, content, input_tokens)
+
+    async def stream(
+        self,
+        messages: list[Message],
+        *,
+        model: str,
+        tools: list[ToolSchema] | None = None,
+        system: str | None = None,
+        max_tokens: int = 4096,
+        **options: Any,
+    ) -> AsyncIterator[str]:
+        """Simulate streaming by emitting the completion in small text chunks.
+
+        This makes the offline provider behave like a real streaming model so the
+        whole streaming path can be exercised in tests without an API key. The
+        ``await asyncio.sleep(0)`` between chunks yields control to the event loop
+        (so concurrent streams interleave) without adding any wall-clock delay.
+        """
+        response = await self.complete(
+            messages, model=model, tools=tools, system=system, max_tokens=max_tokens, **options
+        )
+        content = response.content
+        for start in range(0, len(content), _STREAM_CHUNK_SIZE):
+            yield content[start : start + _STREAM_CHUNK_SIZE]
+            await asyncio.sleep(0)
 
     # ------------------------------------------------------------------ #
     # Helpers

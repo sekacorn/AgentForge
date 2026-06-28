@@ -123,6 +123,7 @@ class Orchestrator:
         system_prompt: str | None = None,
         model: str | None = None,
         principal: Principal | None = None,
+        stream: bool = False,
     ) -> RunResult:
         """Run ``goal`` to completion and return a :class:`RunResult`.
 
@@ -139,6 +140,10 @@ class Orchestrator:
             Force a specific model id, bypassing routing strategy.
         principal:
             The actor on whose behalf the run executes (for RBAC + audit).
+        stream:
+            When True, agents stream model output token-by-token through the event
+            bus (subscribe for ``TOKEN_CHUNK`` events). Default False is identical
+            to the non-streaming path.
         """
         actor = principal or self.principal
         self.access.require(actor, Permission.RUN_AGENT)
@@ -156,10 +161,11 @@ class Orchestrator:
             usage=usage,
             events=self.events,
             audit=self.audit,
+            stream=stream,
         )
         tools_registry = self._resolve_tools(tools) if tools is not None else self.default_tools
 
-        self.events.emit(EventType.RUN_STARTED, run_id=run_id, mode=mode)
+        self.events.emit(EventType.RUN_STARTED, run_id=run_id, mode=mode, stream=stream)
         self.audit.record(
             "run.start", actor=actor.id, run_id=run_id, resource=mode, goal=clean_goal[:200]
         )

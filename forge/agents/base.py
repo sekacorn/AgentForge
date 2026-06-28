@@ -14,15 +14,25 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
+from forge.models.base import ModelProvider
 from forge.models.router import Complexity
 from forge.observability.events import EventType
 from forge.tools.registry import ToolRegistry
-from forge.types import Message, ModelResponse, ToolSchema, Usage
+from forge.types import FinishReason, Message, ModelResponse, ToolSchema, Usage
 
 if TYPE_CHECKING:
     # Imported only for typing to avoid a circular import at runtime
     # (orchestration -> agents -> base -> orchestration).
     from forge.orchestration.context import RunContext
+
+
+def _estimate_tokens(text: str) -> int:
+    """Rough 4-chars-per-token estimate (mirrors EchoProvider's heuristic).
+
+    Used to approximate usage for streamed responses, where the provider yields
+    text deltas rather than an authoritative token count.
+    """
+    return max(1, len(text) // 4)
 
 
 class AgentResult(BaseModel):
@@ -98,9 +108,14 @@ class BaseAgent(abc.ABC):
             EventType.MODEL_CALL_STARTED, run_id=ctx.run_id, agent=self.name, model=decision.model
         )
         try:
-            response = await provider.complete(
-                messages, model=decision.model, tools=tools, max_tokens=max_tokens
-            )
+            if ctx.stream:
+                response = await self._stream_model(
+                    provider, messages, model=decision.model, tools=tools, max_tokens=max_tokens
+                )
+            else:
+                response = await provider.complete(
+                    messages, model=decision.model, tools=tools, max_tokens=max_tokens
+                )
         except Exception as exc:
             # Surface model/provider failures on the event stream (symmetric with
             # tool failures) before letting the error propagate and be audited.
@@ -138,3 +153,56 @@ class BaseAgent(abc.ABC):
         # Halts a runaway run *before* the next expensive call.
         ctx.check_budget()
         return response
+
+    async def _stream_model(
+        self,
+        provider: ModelProvider,
+        messages: list[Message],
+        *,
+        model: str,
+        tools: list[ToolSchema] | None,
+        max_tokens: int,
+    ) -> ModelResponse:
+        """Stream text chunks from ``provider`` onto the event bus, then assemble
+        them into a :class:`ModelResponse` so the agentic loop continues unchanged.
+
+        Emits :data:`EventType.TOKEN_STREAM_START` once, a
+        :data:`EventType.TOKEN_CHUNK` per chunk (carrying the chunk and the running
+        cumulative text), and :data:`EventType.TOKEN_STREAM_END` once when the
+        stream is exhausted. Events are tagged with this agent's name so callers can
+        tell which worker each chunk came from. Usage is estimated, since the text
+        stream does not carry an authoritative token count.
+        """
+        ctx = self._ctx
+        ctx.events.emit(
+            EventType.TOKEN_STREAM_START, run_id=ctx.run_id, agent=self.name, model=model
+        )
+        cumulative = ""
+        async for chunk in provider.stream(
+            messages, model=model, tools=tools, max_tokens=max_tokens
+        ):
+            cumulative += chunk
+            ctx.events.emit(
+                EventType.TOKEN_CHUNK,
+                run_id=ctx.run_id,
+                agent=self.name,
+                model=model,
+                chunk=chunk,
+                text=cumulative,
+            )
+
+        usage = Usage(
+            input_tokens=_estimate_tokens("".join(m.content for m in messages)),
+            output_tokens=_estimate_tokens(cumulative),
+        )
+        ctx.events.emit(
+            EventType.TOKEN_STREAM_END,
+            run_id=ctx.run_id,
+            agent=self.name,
+            model=model,
+            text=cumulative,
+            tokens=usage.output_tokens,
+        )
+        return ModelResponse(
+            model=model, content=cumulative, finish_reason=FinishReason.STOP, usage=usage
+        )
