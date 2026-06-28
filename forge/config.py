@@ -115,6 +115,10 @@ class ForgeConfig(BaseModel):
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
     #: Provider name -> API key. Populated from the environment by default.
     api_keys: dict[str, str] = Field(default_factory=dict)
+    #: Base URL of a local Ollama server (overridable via ``OLLAMA_BASE_URL``). The
+    #: orchestrator offers the Ollama provider when this is set explicitly or when a
+    #: server is reachable here; see ``Orchestrator._build_default_providers``.
+    ollama_base_url: str = "http://localhost:11434"
 
     # ------------------------------------------------------------------ #
     # Loaders
@@ -153,6 +157,9 @@ class ForgeConfig(BaseModel):
             value = os.environ.get(env_name)
             if value:
                 self.api_keys[provider] = value
+
+        if (ollama_url := os.environ.get("OLLAMA_BASE_URL")) is not None:
+            self.ollama_base_url = ollama_url
 
         if (level := os.environ.get("FORGE_LOG_LEVEL")) is not None:
             self.observability.log_level = level

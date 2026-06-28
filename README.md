@@ -67,6 +67,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Anthropic provider (Claude Haiku 4.5, Sonnet 4.6, Opus 4.8, Fable 5) | Shipped |
 | OpenAI provider (gpt-4o-mini, gpt-4o, gpt-4.1, o3) | Shipped |
 | Offline deterministic provider (zero config, no API key) | Shipped |
+| Ollama provider (local models, zero cost, no API key, auto-detected) | Shipped |
 | Pre-flight + per-step budget caps | Shipped |
 | Tool sandboxing (allowlist/denylist, timeouts, dangerous-denied-by-default) | Shipped |
 | RBAC (admin / operator / developer / viewer) | Shipped |
@@ -81,7 +82,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | 47 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backends (pgvector, SQLite-VSS) | Planned |
 | OpenTelemetry export for traces and metrics | Planned |
-| Ollama / Bedrock / Vertex providers | Planned |
+| Bedrock / Vertex providers | Planned |
 | Policy-as-code for tool governance | Planned |
 | Hosted SaaS control plane (TypeScript / Next.js) | Future |
 
@@ -131,9 +132,9 @@ An honest snapshot of what works today versus what is on the way. Everything mar
   JSON-Schema generated automatically from your type hints and docstring.
 - **Pluggable memory.** Short-term conversation memory plus a dependency-free
   in-memory vector store for RAG — swap in any backend behind one tiny interface.
-- **Provider-agnostic core.** Anthropic (Claude) and OpenAI (GPT / o-series) ship in
-  the box alongside a deterministic offline echo provider; add any provider by
-  implementing one method.
+- **Provider-agnostic core.** Anthropic (Claude), OpenAI (GPT / o-series), and Ollama
+  (local models, zero cost) ship in the box alongside a deterministic offline echo
+  provider; add any provider by implementing one method.
 
 ### Security from the start
 - **Tool sandboxing** with allowlists/denylists, per-tool timeouts, and
@@ -182,6 +183,15 @@ pip install "agentforge-oss[all,dev]"            # everything + test/lint toolin
 > API key. Set `ANTHROPIC_API_KEY` to route automatically to Claude, or `OPENAI_API_KEY`
 > to route to GPT. Both keys can be set at once; Forge prefers Anthropic by default
 > (configurable).
+
+> **Ollama support is built in** — no extra install needed (it uses `httpx`, already a
+> core dependency, so there is no `[ollama]` extra). Just run Ollama locally and Forge
+> auto-detects it (or set `OLLAMA_BASE_URL` for a custom/remote server):
+
+```bash
+ollama serve
+ollama pull llama3.1:8b
+```
 
 ---
 
@@ -295,10 +305,10 @@ governance (RBAC + budgets + audit verification).
               │                          │
               │      ┌───────────────────┴───────────────┐
               ▼      ▼                                    ▼
-       ┌────────────────┐                        ┌───────────────────────────┐
-       │  Model Router  │  picks model by        │  Model Providers          │
-       │ cost / quality │  strategy + budget ───▶│ Anthropic · OpenAI · Echo │
-       └───────┬────────┘                        └───────────────────────────┘
+       ┌────────────────┐                        ┌────────────────────────────────────┐
+       │  Model Router  │  picks model by        │  Model Providers                   │
+       │ cost / quality │  strategy + budget ───▶│ Anthropic · OpenAI · Ollama · Echo │
+       └───────┬────────┘                        └────────────────────────────────────┘
                │ pricing
                ▼
        ┌────────────────┐   cross-cutting, on every step:
@@ -310,7 +320,7 @@ Every layer is swappable:
 
 | Layer | Default | Swap in… |
 |---|---|---|
-| Provider | Echo (offline), Anthropic, OpenAI | Any `ModelProvider` (local, Bedrock, Vertex, …) |
+| Provider | Echo (offline), Anthropic, OpenAI, Ollama | Any `ModelProvider` (Bedrock, Vertex, …) |
 | Routing | `balanced` strategy | Your own strategy / `fixed` model |
 | Memory | In-memory vector store | Any `Memory` backend (pgvector, Pinecone, …) |
 | Tools | `calculator`, `utc_now` | Any `@tool` function |

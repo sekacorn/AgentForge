@@ -15,9 +15,11 @@ Everything is async-first; ``run_sync`` is provided for scripts and the CLI.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Iterable
 from typing import Literal
 
+import httpx
 from pydantic import BaseModel
 
 from forge.agents.agent import Agent
@@ -29,6 +31,7 @@ from forge.exceptions import ConfigurationError, ForgeError
 from forge.models.base import ModelProvider
 from forge.models.providers.anthropic import AnthropicProvider
 from forge.models.providers.echo import EchoProvider
+from forge.models.providers.ollama import OllamaProvider
 from forge.models.providers.openai import OpenAIProvider
 from forge.models.registry import ModelRegistry
 from forge.models.router import ModelRouter
@@ -243,7 +246,12 @@ class Orchestrator:
     # Internals
     # ------------------------------------------------------------------ #
     def _build_default_providers(self) -> dict[str, ModelProvider]:
-        """Always provide the offline echo provider; add Anthropic/OpenAI if keyed."""
+        """Always provide the offline echo provider; add Anthropic/OpenAI/Ollama.
+
+        Anthropic and OpenAI are added when their API keys are present. Ollama is
+        added when ``OLLAMA_BASE_URL`` is set explicitly or a local server is
+        reachable (a short, best-effort probe that never blocks startup).
+        """
         providers: dict[str, ModelProvider] = {"echo": EchoProvider()}
         anthropic_key = self.config.api_key_for("anthropic")
         if anthropic_key:
@@ -257,14 +265,39 @@ class Orchestrator:
                 providers["openai"] = OpenAIProvider(api_key=openai_key)
             except (ForgeError, ImportError) as exc:
                 self._log.warning("OpenAI provider unavailable: %s", exc)
+        if self._should_offer_ollama():
+            try:
+                providers["ollama"] = OllamaProvider(base_url=self.config.ollama_base_url)
+            except (ForgeError, ImportError) as exc:
+                self._log.warning("Ollama provider unavailable: %s", exc)
         return providers
+
+    def _should_offer_ollama(self) -> bool:
+        """Whether to wire up the Ollama provider for a default build.
+
+        Setting ``OLLAMA_BASE_URL`` is an explicit opt-in (a remote/custom server
+        the user clearly wants). Otherwise, probe the default local server so a
+        running Ollama is picked up automatically.
+        """
+        if os.environ.get("OLLAMA_BASE_URL"):
+            return True
+        return self._ollama_reachable(self.config.ollama_base_url)
+
+    @staticmethod
+    def _ollama_reachable(base_url: str) -> bool:
+        """Best-effort 1s probe of a local Ollama server. Never blocks startup."""
+        try:
+            response = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=1.0)
+            return response.status_code == 200
+        except Exception:  # noqa: BLE001 - any failure just means "not available"
+            return False
 
     def _apply_default_provider(self) -> None:
         """Choose a default provider so real work is not shadowed by free echo models.
 
-        Precedence: explicit user config > Anthropic > OpenAI > Echo. The chosen
-        provider's cheapest model is used for the lightweight planning pass; echo
-        stays available as the offline fallback.
+        Precedence: explicit user config > Anthropic > OpenAI > Ollama > Echo. The
+        chosen provider's cheapest model is used for the lightweight planning pass;
+        echo stays available as the offline fallback.
         """
         routing = self.config.routing
         if routing.default_provider is not None or routing.allow_providers is not None:
@@ -274,6 +307,8 @@ class Orchestrator:
             default_provider, cheapest = "anthropic", "claude-haiku-4-5"
         elif "openai" in available:
             default_provider, cheapest = "openai", "gpt-4o-mini"
+        elif "ollama" in available:
+            default_provider, cheapest = "ollama", "llama3.2:3b"
         else:
             return  # echo-only: keep the offline defaults
         routing.default_provider = default_provider

@@ -61,7 +61,12 @@ from forge.models import (
     ModelTier,
     RoutingDecision,
 )
-from forge.models.providers import AnthropicProvider, EchoProvider, OpenAIProvider
+from forge.models.providers import (
+    AnthropicProvider,
+    EchoProvider,
+    OllamaProvider,
+    OpenAIProvider,
+)
 from forge.observability import (
     Event,
     EventBus,
@@ -129,6 +134,7 @@ __all__ = [
     "EchoProvider",
     "AnthropicProvider",
     "OpenAIProvider",
+    "OllamaProvider",
     # Tools
     "Tool",
     "tool",

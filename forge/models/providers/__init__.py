@@ -9,6 +9,7 @@ orchestrator.
 
 from forge.models.providers.anthropic import AnthropicProvider
 from forge.models.providers.echo import EchoProvider
+from forge.models.providers.ollama import OllamaProvider
 from forge.models.providers.openai import OpenAIProvider
 
-__all__ = ["AnthropicProvider", "EchoProvider", "OpenAIProvider"]
+__all__ = ["AnthropicProvider", "EchoProvider", "OllamaProvider", "OpenAIProvider"]
