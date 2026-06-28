@@ -120,6 +120,10 @@ pip install "agentforge-oss[anthropic]"  # + Claude provider
 pip install "agentforge-oss[all,dev]"    # everything + test/lint tooling
 ```
 
+> **Note:** The PyPI package is `agentforge-oss` — so `pip install agentforge-oss`.  
+> The import is still `import forge`. This follows the same convention as  
+> `pip install Pillow` → `import PIL`.
+
 > Forge runs **fully offline** out of the box using a deterministic provider, so you
 > can explore the whole platform — routing, tools, supervision, audit — without an
 > API key. Set `ANTHROPIC_API_KEY` to route to Claude automatically.
