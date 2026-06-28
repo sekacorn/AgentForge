@@ -5,6 +5,18 @@ Thanks for your interest in making Forge better! Forge aims to be a
 core to a high bar: typed, tested, and secure by default. This guide gets you
 productive fast.
 
+## Good first contributions
+
+Not sure where to start? These areas are well-suited for first-time contributors:
+
+- **New provider** — add Ollama, Bedrock, or Vertex by implementing one method (`ModelProvider.complete()`). See `forge/models/providers/anthropic.py` as the reference.
+- **New built-in tool** — add a useful `@tool` function under `forge/tools/builtin/`. See `forge/tools/builtin/calculator.py` as the reference.
+- **Durable memory backend** — implement `Memory` ABC for SQLite-VSS, pgvector, or Redis. See `forge/memory/base.py` for the interface.
+- **New routing strategy** — add a strategy to `forge/models/router.py`. The interface is small and well-typed.
+- **Example workflow** — add a runnable script under `examples/` showing Forge solving a real business problem.
+
+All contributions must pass `pytest -q`, `mypy forge`, and `ruff check .` before merging.
+
 ## Ground rules
 
 - **Keep it typed.** The core passes `mypy --strict`. New code should too.
