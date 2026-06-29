@@ -57,7 +57,8 @@ dependencies = [
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.20"]
 openai = ["openai>=1.0"]
-all = ["anthropic>=0.20", "openai>=1.0"]
+sqlite = ["aiosqlite>=0.19"]
+all = ["anthropic>=0.20", "openai>=1.0", "aiosqlite>=0.19"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -108,7 +109,7 @@ disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["anthropic.*", "openai.*"]
+module = ["anthropic.*", "openai.*", "aiosqlite.*"]
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------------------

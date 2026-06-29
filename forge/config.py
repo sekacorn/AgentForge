@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from forge.exceptions import ConfigurationError
 
 RoutingStrategy = Literal["balanced", "cost_optimized", "quality_first", "fixed"]
+MemoryBackend = Literal["inmemory", "sqlite"]
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -119,6 +120,11 @@ class ForgeConfig(BaseModel):
     #: orchestrator offers the Ollama provider when this is set explicitly or when a
     #: server is reachable here; see ``Orchestrator._build_default_providers``.
     ollama_base_url: str = "http://localhost:11434"
+    #: Retrieval-memory backend (see ``forge.memory.build_memory``). ``"sqlite"``
+    #: persists RAG state across restarts and needs the optional ``aiosqlite`` extra.
+    memory_backend: MemoryBackend = "inmemory"
+    #: Database file path for the SQLite memory backend.
+    memory_path: str = "forge_memory.db"
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> ForgeConfig:
@@ -156,6 +162,11 @@ class ForgeConfig(BaseModel):
 
         if (ollama_url := os.environ.get("OLLAMA_BASE_URL")) is not None:
             self.ollama_base_url = ollama_url
+
+        if (backend := os.environ.get("FORGE_MEMORY_BACKEND")) is not None:
+            self.memory_backend = backend  # type: ignore[assignment]
+        if (mem_path := os.environ.get("FORGE_MEMORY_PATH")) is not None:
+            self.memory_path = mem_path
 
         if (level := os.environ.get("FORGE_LOG_LEVEL")) is not None:
             self.observability.log_level = level

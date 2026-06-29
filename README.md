@@ -78,9 +78,10 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Streaming token output through the event bus (`stream=True`) | Shipped |
 | Per-run cost reporting (tokens + USD, per model, per agent) | Shipped |
 | Conversation memory + in-memory RAG vector store | Shipped |
+| Durable memory backend (SQLite, persistent RAG, no vector extension) | Shipped |
 | CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
 | 47 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
-| Durable memory backends (pgvector, SQLite-VSS) | Planned |
+| Durable memory backends (pgvector, Redis) | Planned |
 | OpenTelemetry export for traces and metrics | Planned |
 | Bedrock / Vertex providers | Planned |
 | Policy-as-code for tool governance | Planned |
@@ -322,7 +323,7 @@ Every layer is swappable:
 |---|---|---|
 | Provider | Echo (offline), Anthropic, OpenAI, Ollama | Any `ModelProvider` (Bedrock, Vertex, …) |
 | Routing | `balanced` strategy | Your own strategy / `fixed` model |
-| Memory | In-memory vector store | Any `Memory` backend (pgvector, Pinecone, …) |
+| Memory | InMemoryVectorStore (default), SQLiteMemoryStore | Any `Memory` backend (pgvector, Redis, …) |
 | Tools | `calculator`, `utc_now` | Any `@tool` function |
 | Audit | Hash-chained JSONL | Forward events to your SIEM via the event bus |
 

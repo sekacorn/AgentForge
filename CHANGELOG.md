@@ -12,6 +12,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Ollama provider: local LLM execution via Ollama REST API (llama3.2:3b, llama3.1:8b, llama3.1:70b, mistral:7b, qwen2.5:7b, deepseek-r1:8b) — zero cost, no API key, air-gap compatible
 - Native streaming support in OllamaProvider (newline-delimited JSON stream)
 - OLLAMA_BASE_URL configuration with automatic reachability detection
+- SQLiteMemoryStore: persistent RAG backend using stdlib sqlite3 + aiosqlite, zero external vector extension required
+- FORGE_MEMORY_BACKEND=sqlite config to enable persistence across restarts
+- New example: examples/rag_persistent.py
 
 ## [0.2.0] — 2026-06-28
 

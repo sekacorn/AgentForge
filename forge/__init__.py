@@ -51,7 +51,13 @@ from forge.exceptions import (
     ToolTimeoutError,
     ToolValidationError,
 )
-from forge.memory import ConversationMemory, InMemoryVectorStore, Memory, MemoryItem
+from forge.memory import (
+    ConversationMemory,
+    InMemoryVectorStore,
+    Memory,
+    MemoryItem,
+    SQLiteMemoryStore,
+)
 from forge.models import (
     Complexity,
     ModelInfo,
@@ -141,6 +147,7 @@ __all__ = [
     "MemoryItem",
     "ConversationMemory",
     "InMemoryVectorStore",
+    "SQLiteMemoryStore",
     "Event",
     "EventBus",
     "EventType",
