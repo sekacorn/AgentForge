@@ -105,7 +105,11 @@ class BaseAgent(abc.ABC):
         max_tokens = min(self.max_tokens, info.max_output_tokens)
 
         ctx.events.emit(
-            EventType.MODEL_CALL_STARTED, run_id=ctx.run_id, agent=self.name, model=decision.model
+            EventType.MODEL_CALL_STARTED,
+            run_id=ctx.run_id,
+            agent=self.name,
+            model=decision.model,
+            provider=decision.provider,
         )
         try:
             if ctx.stream:

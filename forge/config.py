@@ -125,6 +125,12 @@ class ForgeConfig(BaseModel):
     memory_backend: MemoryBackend = "inmemory"
     #: Database file path for the SQLite memory backend.
     memory_path: str = "forge_memory.db"
+    #: Export traces + metrics via OpenTelemetry (needs the optional ``otel`` extra).
+    otel_enabled: bool = False
+    #: OTLP endpoint (e.g. ``http://localhost:4317``); ``None`` exports to the console.
+    otel_endpoint: str | None = None
+    #: ``service.name`` resource attribute reported to the OTel backend.
+    otel_service_name: str = "forge"
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> ForgeConfig:
@@ -167,6 +173,12 @@ class ForgeConfig(BaseModel):
             self.memory_backend = backend  # type: ignore[assignment]
         if (mem_path := os.environ.get("FORGE_MEMORY_PATH")) is not None:
             self.memory_path = mem_path
+
+        self.otel_enabled = _env_bool("FORGE_OTEL_ENABLED", self.otel_enabled)
+        if (otel_ep := os.environ.get("FORGE_OTEL_ENDPOINT")) is not None:
+            self.otel_endpoint = otel_ep
+        if (otel_sn := os.environ.get("FORGE_OTEL_SERVICE_NAME")) is not None:
+            self.otel_service_name = otel_sn
 
         if (level := os.environ.get("FORGE_LOG_LEVEL")) is not None:
             self.observability.log_level = level

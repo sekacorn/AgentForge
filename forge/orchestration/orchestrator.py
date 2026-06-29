@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import Iterable
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 from pydantic import BaseModel
@@ -46,6 +46,9 @@ from forge.tools.base import Tool
 from forge.tools.builtin import SAFE_TOOLS
 from forge.tools.registry import ToolRegistry
 from forge.types import new_id
+
+if TYPE_CHECKING:
+    from forge.observability.otel import OTelExporter
 
 RunMode = Literal["supervisor", "single", "auto"]
 
@@ -103,6 +106,9 @@ class Orchestrator:
         self.default_tools = (
             self._resolve_tools(tools) if tools is not None else ToolRegistry(list(SAFE_TOOLS))
         )
+        #: Set when OTel export is enabled and the orchestrator is entered as a
+        #: context manager; ``None`` (and zero overhead) otherwise.
+        self._otel_exporter: OTelExporter | None = None
 
         self._log.info(
             "Forge orchestrator ready (providers=%s, models=%d)",
@@ -234,9 +240,21 @@ class Orchestrator:
             await provider.aclose()
 
     async def __aenter__(self) -> Orchestrator:
+        if self.config.otel_enabled:
+            # Lazy import: opentelemetry is only loaded when export is enabled.
+            from forge.observability.otel import OTelExporter
+
+            self._otel_exporter = OTelExporter(
+                service_name=self.config.otel_service_name,
+                endpoint=self.config.otel_endpoint,
+            )
+            self._otel_exporter.attach(self.events)
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
+        if self._otel_exporter is not None:
+            self._otel_exporter.shutdown()
+            self._otel_exporter = None
         await self.aclose()
 
     def _build_default_providers(self) -> dict[str, ModelProvider]:

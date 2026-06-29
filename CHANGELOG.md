@@ -15,6 +15,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - SQLiteMemoryStore: persistent RAG backend using stdlib sqlite3 + aiosqlite, zero external vector extension required
 - FORGE_MEMORY_BACKEND=sqlite config to enable persistence across restarts
 - New example: examples/rag_persistent.py
+- OpenTelemetry export: traces (forge.run, forge.agent, forge.model_call, forge.tool_call spans) and metrics (runs, duration, tokens, tool calls) via opentelemetry-sdk
+- ConsoleSpanExporter by default (zero infra), OTLP endpoint for production
+- FORGE_OTEL_ENABLED, FORGE_OTEL_ENDPOINT, FORGE_OTEL_SERVICE_NAME config
+- New example: examples/otel_tracing.py
 
 ## [0.2.0] — 2026-06-28
 

@@ -58,7 +58,19 @@ dependencies = [
 anthropic = ["anthropic>=0.20"]
 openai = ["openai>=1.0"]
 sqlite = ["aiosqlite>=0.19"]
-all = ["anthropic>=0.20", "openai>=1.0", "aiosqlite>=0.19"]
+otel = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+]
+all = [
+    "anthropic>=0.20",
+    "openai>=1.0",
+    "aiosqlite>=0.19",
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -109,7 +121,7 @@ disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["anthropic.*", "openai.*", "aiosqlite.*"]
+module = ["anthropic.*", "openai.*", "aiosqlite.*", "opentelemetry.*"]
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------------------

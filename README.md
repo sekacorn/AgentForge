@@ -77,12 +77,12 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Event bus (21 lifecycle event types) | Shipped |
 | Streaming token output through the event bus (`stream=True`) | Shipped |
 | Per-run cost reporting (tokens + USD, per model, per agent) | Shipped |
+| OpenTelemetry export (traces + metrics: console or OTLP to Jaeger/Grafana/Datadog) | Shipped |
 | Conversation memory + in-memory RAG vector store | Shipped |
 | Durable memory backend (SQLite, persistent RAG, no vector extension) | Shipped |
 | CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
 | 47 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backends (pgvector, Redis) | Planned |
-| OpenTelemetry export for traces and metrics | Planned |
 | Bedrock / Vertex providers | Planned |
 | Policy-as-code for tool governance | Planned |
 | Hosted SaaS control plane (TypeScript / Next.js) | Future |
@@ -160,6 +160,10 @@ An honest snapshot of what works today versus what is on the way. Everything mar
   `TOKEN_STREAM_START` / `TOKEN_CHUNK` / `TOKEN_STREAM_END` events — each tagged with
   the agent that produced it, so you can render live output even across parallel
   workers. `forge run "..." --stream` gives the classic live-typing terminal feel.
+- **OpenTelemetry export.** Every run becomes a tree of spans (`forge.run` →
+  `forge.agent` → `forge.model_call` → `forge.tool_call`) exportable to any
+  OTel-compatible backend — Jaeger, Grafana, Datadog, Honeycomb, New Relic. Console
+  exporter by default (zero infra); set an OTLP endpoint for production.
 - **Structured logging** (human or JSON) and a per-run **usage/cost report** broken
   down per model and per agent.
 
