@@ -118,7 +118,13 @@ class AuditLogger:
                 line = line.strip()
                 if not line:
                     continue
-                entry = AuditEntry.model_validate_json(line)
+                try:
+                    entry = AuditEntry.model_validate_json(line)
+                except ValueError:
+                    # A line that no longer parses is itself tampering: fail closed
+                    # (return False) rather than raising out of a bool-returning check.
+                    _log.error("audit chain broken at line %d (unparseable record)", line_no)
+                    return False
                 if entry.previous_hash != prev:
                     _log.error("audit chain broken at line %d (prev_hash mismatch)", line_no)
                     return False

@@ -8,11 +8,21 @@ keeps egress off by default for untrusted workloads.
 
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 import httpx
 
 from forge.tools.base import tool
 
 _MAX_BYTES = 20_000
+
+#: Hosts refused outright to blunt the most dangerous SSRF targets (cloud metadata
+#: and loopback). This is a coarse literal denylist, not full SSRF protection: it
+#: does not defeat DNS rebinding, alternate IP encodings, or other private ranges —
+#: operators allowlisting this tool should still enforce network egress controls.
+_BLOCKED_HOSTS = frozenset(
+    {"localhost", "127.0.0.1", "0.0.0.0", "::1", "169.254.169.254", "metadata.google.internal"}
+)
 
 
 @tool(dangerous=True)
@@ -25,12 +35,28 @@ async def http_get(url: str, timeout: float = 10.0) -> str:  # noqa: ASYNC109
     """
     if not url.lower().startswith(("http://", "https://")):
         return "Error: only http(s) URLs are supported."
+    if (urlparse(url).hostname or "").lower() in _BLOCKED_HOSTS:
+        return "Error: refusing to fetch a loopback or link-local address."
+
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
-            response = await client.get(url)
+        # Redirects are not followed (a redirect to an internal address is a classic
+        # SSRF vector), and the body is streamed so a huge response cannot exhaust
+        # memory before the size cap applies.
+        async with (
+            httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client,
+            client.stream("GET", url) as response,
+        ):
+            status = response.status_code
+            chunks: list[bytes] = []
+            total = 0
+            async for chunk in response.aiter_bytes():
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > _MAX_BYTES:
+                    break
     except httpx.HTTPError as exc:
         return f"Error: request failed ({exc})"
 
-    body = response.text[:_MAX_BYTES]
-    suffix = "... [truncated]" if len(response.text) > _MAX_BYTES else ""
-    return f"HTTP {response.status_code}\n{body}{suffix}"
+    body = b"".join(chunks)[:_MAX_BYTES].decode("utf-8", errors="replace")
+    suffix = "... [truncated]" if total > _MAX_BYTES else ""
+    return f"HTTP {status}\n{body}{suffix}"

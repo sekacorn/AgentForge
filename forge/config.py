@@ -62,13 +62,13 @@ class RoutingConfig(BaseModel):
 class BudgetConfig(BaseModel):
     """Hard limits that keep an autonomous run from running away with spend."""
 
-    max_usd_per_run: float | None = None
-    max_tokens_per_run: int | None = None
+    max_usd_per_run: float | None = Field(default=None, ge=0)
+    max_tokens_per_run: int | None = Field(default=None, ge=1)
     #: Maximum reasoning/acting iterations a single agent may take.
-    max_steps_per_agent: int = 12
+    max_steps_per_agent: int = Field(default=12, ge=1)
     #: Maximum number of dynamic workers a supervisor may spawn for one goal.
     #: Also bounds parallelism: subtasks run in concurrent batches of this size.
-    max_workers: int = 5
+    max_workers: int = Field(default=5, ge=1)
 
 
 class SecurityConfig(BaseModel):

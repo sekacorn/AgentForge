@@ -21,6 +21,7 @@ Use it as an async context manager so the connection is opened and closed cleanl
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 from pathlib import Path
@@ -55,6 +56,7 @@ class SQLiteMemoryStore(Memory):
         self._path = str(path)
         self._dim = embedding_dim
         self._conn: aiosqlite.Connection | None = None
+        self._lock = asyncio.Lock()
 
     def _embed(self, text: str) -> list[float]:
         """Hash tokens into a fixed-dimension, L2-normalized term-frequency vector.
@@ -78,18 +80,25 @@ class SQLiteMemoryStore(Memory):
         await self.aclose()
 
     async def _ensure_conn(self) -> aiosqlite.Connection:
-        """Open the connection (and create the schema) on first use."""
+        """Open the connection (and create the schema) on first use.
+
+        Guarded by a lock so that concurrent first use opens exactly one
+        connection instead of racing to create (and leak) duplicates.
+        """
         if self._conn is not None:
             return self._conn
-        try:
-            import aiosqlite
-        except ImportError as exc:
-            raise ImportError(_AIOSQLITE_MISSING) from exc
-        conn = await aiosqlite.connect(self._path)
-        await conn.execute(_CREATE_TABLE_SQL)
-        await conn.commit()
-        self._conn = conn
-        return conn
+        async with self._lock:
+            if self._conn is not None:
+                return self._conn
+            try:
+                import aiosqlite
+            except ImportError as exc:
+                raise ImportError(_AIOSQLITE_MISSING) from exc
+            conn = await aiosqlite.connect(self._path)
+            await conn.execute(_CREATE_TABLE_SQL)
+            await conn.commit()
+            self._conn = conn
+            return conn
 
     async def add(self, text: str, *, metadata: dict[str, object] | None = None) -> str:
         conn = await self._ensure_conn()
