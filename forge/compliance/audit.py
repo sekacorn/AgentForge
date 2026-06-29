@@ -128,7 +128,6 @@ class AuditLogger:
                 prev = entry.hash
         return True
 
-    # ------------------------------------------------------------------ #
     @staticmethod
     def _compute_hash(entry: AuditEntry) -> str:
         digest = hashlib.sha256()

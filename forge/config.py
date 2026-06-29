@@ -120,9 +120,6 @@ class ForgeConfig(BaseModel):
     #: server is reachable here; see ``Orchestrator._build_default_providers``.
     ollama_base_url: str = "http://localhost:11434"
 
-    # ------------------------------------------------------------------ #
-    # Loaders
-    # ------------------------------------------------------------------ #
     @classmethod
     def load(cls, path: str | Path | None = None) -> ForgeConfig:
         """Build a config from (optional) TOML file overlaid with environment.
@@ -149,7 +146,6 @@ class ForgeConfig(BaseModel):
 
     def _apply_environment(self) -> None:
         """Overlay environment variables onto this config in place."""
-        # Provider API keys (conventional names take priority).
         for provider, env_name in (
             ("anthropic", "ANTHROPIC_API_KEY"),
             ("openai", "OPENAI_API_KEY"),

@@ -67,7 +67,6 @@ class Supervisor(BaseAgent):
         )
         ctx.audit.record("agent.start", actor=self.name, run_id=ctx.run_id, resource=goal[:200])
 
-        # 1) Plan.
         plan = await self._plan(goal)
         ctx.events.emit(EventType.PLAN_CREATED, run_id=ctx.run_id, agent=self.name, subtasks=plan)
         ctx.audit.record(
@@ -78,10 +77,8 @@ class Supervisor(BaseAgent):
             subtasks=plan,
         )
 
-        # 2) Delegate subtasks to workers, running each batch concurrently.
         children = await self._run_workers(plan)
 
-        # 3) Synthesise a final answer and assemble the report.
         summary = await self._synthesize(goal, children)
         report = self._format_report(goal, plan, children, summary)
 
@@ -102,9 +99,6 @@ class Supervisor(BaseAgent):
             children=children,
         )
 
-    # ------------------------------------------------------------------ #
-    # Parallel worker execution
-    # ------------------------------------------------------------------ #
     async def _run_workers(self, plan: list[str]) -> list[AgentResult]:
         """Run the planned subtasks as workers, concurrently and in bounded batches.
 
@@ -194,9 +188,6 @@ class Supervisor(BaseAgent):
             success=False,
         )
 
-    # ------------------------------------------------------------------ #
-    # Planning & synthesis
-    # ------------------------------------------------------------------ #
     async def _plan(self, goal: str) -> list[str]:
         prompt = (
             f"{PLAN_MARKER} You are a planning supervisor. Decompose the goal into a minimal, "
@@ -225,9 +216,6 @@ class Supervisor(BaseAgent):
         response = await self._invoke_model(self._with_system(prompt), complexity=Complexity.MEDIUM)
         return response.content
 
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
     def _with_system(self, user_content: str) -> list[Message]:
         messages: list[Message] = []
         if self.system_prompt:

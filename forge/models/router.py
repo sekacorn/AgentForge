@@ -111,7 +111,6 @@ class ModelRouter:
 
         by_name = {m.name: m for m in candidates}
 
-        # Explicit override wins, if it is actually usable.
         if override is not None:
             if override not in by_name:
                 raise ModelRoutingError(

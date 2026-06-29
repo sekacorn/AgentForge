@@ -34,16 +34,10 @@ class ForgeError(Exception):
         return self.message
 
 
-# --------------------------------------------------------------------------- #
-# Configuration
-# --------------------------------------------------------------------------- #
 class ConfigurationError(ForgeError):
     """Invalid, missing, or inconsistent configuration."""
 
 
-# --------------------------------------------------------------------------- #
-# Model providers & routing
-# --------------------------------------------------------------------------- #
 class ProviderError(ForgeError):
     """Base class for errors originating from a model provider."""
 
@@ -64,9 +58,6 @@ class ModelRoutingError(ForgeError):
     """No model could be selected that satisfies the routing constraints."""
 
 
-# --------------------------------------------------------------------------- #
-# Tools
-# --------------------------------------------------------------------------- #
 class ToolError(ForgeError):
     """Base class for tool-related errors."""
 
@@ -87,9 +78,6 @@ class ToolTimeoutError(ToolError):
     """A tool exceeded its execution time budget."""
 
 
-# --------------------------------------------------------------------------- #
-# Agents & orchestration
-# --------------------------------------------------------------------------- #
 class AgentError(ForgeError):
     """Base class for agent execution errors."""
 
@@ -102,9 +90,6 @@ class OrchestrationError(ForgeError):
     """An error occurred while coordinating multiple agents."""
 
 
-# --------------------------------------------------------------------------- #
-# Governance: budgets, security, compliance
-# --------------------------------------------------------------------------- #
 class BudgetExceededError(ForgeError):
     """A run exceeded its configured cost or token budget."""
 

@@ -52,7 +52,6 @@ class Agent(BaseAgent):
                 agent=self.name, output=response.content, usage=self._own_usage(), steps=steps
             )
 
-        # Loop exhausted without a final answer.
         ctx.events.emit(
             EventType.AGENT_FAILED, run_id=ctx.run_id, agent=self.name, reason="max_steps_exceeded"
         )

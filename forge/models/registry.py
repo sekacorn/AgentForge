@@ -71,7 +71,6 @@ def _default_models() -> list[ModelInfo]:
     list pricing and capabilities.
     """
     return [
-        # -- Offline / deterministic provider ------------------------------- #
         ModelInfo(
             name="echo-mini",
             provider="echo",
@@ -94,7 +93,6 @@ def _default_models() -> list[ModelInfo]:
             supports_tools=True,
             description="Deterministic offline model for tests and demos (large tier).",
         ),
-        # -- Anthropic Claude family --------------------------------------- #
         ModelInfo(
             name="claude-haiku-4-5",
             provider="anthropic",
@@ -142,7 +140,6 @@ def _default_models() -> list[ModelInfo]:
             supports_thinking=True,
             description="Most capable model for the most demanding reasoning tasks.",
         ),
-        # -- OpenAI GPT family --------------------------------------------- #
         ModelInfo(
             name="gpt-4o-mini",
             provider="openai",
@@ -188,7 +185,6 @@ def _default_models() -> list[ModelInfo]:
             supports_thinking=True,
             description="OpenAI reasoning model for the most demanding problems.",
         ),
-        # -- Ollama local models (free: local compute only) ---------------- #
         # These run on a local Ollama server and cost nothing. Each must be pulled
         # locally first, e.g. ``ollama pull llama3.1:8b``, before it can be used.
         ModelInfo(

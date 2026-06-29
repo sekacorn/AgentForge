@@ -89,7 +89,6 @@ class OpenAIProvider(ModelProvider):
         request[token_param] = max_tokens
         if tools:
             request["tools"] = [self._to_api_tool(t) for t in tools]
-        # Pass-through for advanced options.
         for key in ("tool_choice", "temperature", "response_format"):
             if key in options and options[key] is not None:
                 request[key] = options[key]
@@ -112,9 +111,6 @@ class OpenAIProvider(ModelProvider):
     async def aclose(self) -> None:
         await self._client.close()
 
-    # ------------------------------------------------------------------ #
-    # Translation: Forge types -> OpenAI wire format
-    # ------------------------------------------------------------------ #
     @staticmethod
     def _to_api_tool(tool: ToolSchema) -> dict[str, Any]:
         return {
@@ -142,7 +138,6 @@ class OpenAIProvider(ModelProvider):
     @staticmethod
     def _convert_message(message: Message) -> list[dict[str, Any]]:
         if message.role == Role.TOOL:
-            # Each tool result is delivered as its own ``tool`` message.
             return [
                 {"role": "tool", "tool_call_id": tr.tool_call_id, "content": tr.content}
                 for tr in message.tool_results
@@ -170,9 +165,6 @@ class OpenAIProvider(ModelProvider):
         role = "assistant" if message.role == Role.ASSISTANT else "user"
         return [{"role": role, "content": message.content}]
 
-    # ------------------------------------------------------------------ #
-    # Translation: OpenAI response -> Forge types
-    # ------------------------------------------------------------------ #
     @staticmethod
     def _from_api_response(response: Any, model: str) -> ModelResponse:
         choice = response.choices[0]

@@ -139,9 +139,6 @@ class EchoProvider(ModelProvider):
             yield content[start : start + _STREAM_CHUNK_SIZE]
             await asyncio.sleep(0)
 
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
     @staticmethod
     def _render(message: Message) -> str:
         parts = [message.content]
@@ -167,7 +164,6 @@ class EchoProvider(ModelProvider):
 
     def _plan(self, goal_text: str) -> str:
         goal = goal_text.replace(PLAN_MARKER, "").strip()
-        # Strip a leading "Goal:" label if present.
         if "Goal:" in goal:
             goal = goal.split("Goal:", 1)[1].strip()
         chunks = [c.strip(" .") for c in _SPLIT_PATTERN.split(goal) if c.strip(" .")]

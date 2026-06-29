@@ -92,7 +92,6 @@ class AnthropicProvider(ModelProvider):
             request["system"] = merged_system
         if tools:
             request["tools"] = [self._to_api_tool(t) for t in tools]
-        # Pass-through for advanced options (e.g. thinking={"type": "adaptive"}).
         for key in ("thinking", "tool_choice", "output_config"):
             if key in options and options[key] is not None:
                 request[key] = options[key]
@@ -117,9 +116,6 @@ class AnthropicProvider(ModelProvider):
     async def aclose(self) -> None:
         await self._client.close()
 
-    # ------------------------------------------------------------------ #
-    # Translation: Forge types -> Anthropic wire format
-    # ------------------------------------------------------------------ #
     @staticmethod
     def _to_api_tool(tool: ToolSchema) -> dict[str, Any]:
         return {
@@ -164,9 +160,6 @@ class AnthropicProvider(ModelProvider):
         role = "assistant" if message.role == Role.ASSISTANT else "user"
         return {"role": role, "content": message.content}
 
-    # ------------------------------------------------------------------ #
-    # Translation: Anthropic response -> Forge types
-    # ------------------------------------------------------------------ #
     @staticmethod
     def _from_api_response(response: Any, model: str) -> ModelResponse:
         text_parts: list[str] = []

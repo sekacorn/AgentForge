@@ -110,9 +110,6 @@ class Orchestrator:
             len(self.registry.all()),
         )
 
-    # ------------------------------------------------------------------ #
-    # Public API
-    # ------------------------------------------------------------------ #
     def subscribe(self, handler) -> None:  # type: ignore[no-untyped-def]
         """Register an event handler (see :class:`~forge.observability.events.Event`)."""
         self.events.subscribe(handler)
@@ -242,9 +239,6 @@ class Orchestrator:
     async def __aexit__(self, *exc_info: object) -> None:
         await self.aclose()
 
-    # ------------------------------------------------------------------ #
-    # Internals
-    # ------------------------------------------------------------------ #
     def _build_default_providers(self) -> dict[str, ModelProvider]:
         """Always provide the offline echo provider; add Anthropic/OpenAI/Ollama.
 

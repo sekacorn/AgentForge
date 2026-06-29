@@ -95,7 +95,6 @@ class Message(BaseModel):
     tool_results: list[ToolResult] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    # -- Ergonomic constructors --------------------------------------------- #
     @classmethod
     def system(cls, content: str) -> Message:
         return cls(role=Role.SYSTEM, content=content)

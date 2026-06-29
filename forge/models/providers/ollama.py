@@ -128,9 +128,6 @@ class OllamaProvider(ModelProvider):
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    # ------------------------------------------------------------------ #
-    # Request building / translation: Forge types -> Ollama wire format
-    # ------------------------------------------------------------------ #
     def _build_payload(
         self,
         messages: list[Message],
@@ -178,7 +175,6 @@ class OllamaProvider(ModelProvider):
     @staticmethod
     def _convert_message(message: Message) -> list[dict[str, Any]]:
         if message.role == Role.TOOL:
-            # Tool results are delivered back as ``tool`` role messages.
             return [{"role": "tool", "content": tr.content} for tr in message.tool_results]
 
         if message.role == Role.ASSISTANT and message.tool_calls:
@@ -197,9 +193,6 @@ class OllamaProvider(ModelProvider):
         role = "assistant" if message.role == Role.ASSISTANT else "user"
         return [{"role": role, "content": message.content}]
 
-    # ------------------------------------------------------------------ #
-    # Error handling / translation: Ollama response -> Forge types
-    # ------------------------------------------------------------------ #
     def _raise_for_status(self, response: httpx.Response, model: str) -> None:
         """Turn a non-200 Ollama response into a clear :class:`ProviderResponseError`.
 
