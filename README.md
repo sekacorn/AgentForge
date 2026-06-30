@@ -434,9 +434,9 @@ the core typed (`mypy --strict`) and tested.
 
 ### Good first contributions
 
-- **New model provider** (Vertex, Gemini, Cohere) — implement one method.
+- **New model provider** (Google Vertex, Gemini, Cohere, Mistral) — implement one method. See forge/models/providers/anthropic.py as the reference.
 - **New built-in tool** (web search, file read, database query).
-- **Durable memory backend** (SQLite-VSS, pgvector, Redis).
+- **Durable memory backend** (pgvector, Redis) — SQLite ships in the box already; pgvector and Redis are the next backends behind the same Memory interface.
 - **Routing strategy** (a custom cost/quality tradeoff).
 - **Example workflows** that show Forge solving a real business problem.
 
