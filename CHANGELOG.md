@@ -8,6 +8,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-30
+
 ### Added
 - Amazon Bedrock provider: Claude 3.5 Haiku/Sonnet, Llama 3.1 70B/405B, Mistral Large via the unified Converse API
 - Standard AWS credential chain (env vars, profile, IAM role) — no custom credential handling

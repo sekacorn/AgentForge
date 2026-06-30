@@ -5,4 +5,4 @@ Hatchling reads ``__version__`` from this file at build time (see
 it for runtime access via ``forge.__version__``.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
