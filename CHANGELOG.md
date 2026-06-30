@@ -8,6 +8,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-29
+
 ### Added
 - Ollama provider: local LLM execution via Ollama REST API (llama3.2:3b, llama3.1:8b, llama3.1:70b, mistral:7b, qwen2.5:7b, deepseek-r1:8b) — zero cost, no API key, air-gap compatible
 - Native streaming support in OllamaProvider (newline-delimited JSON stream)

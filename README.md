@@ -12,7 +12,7 @@ with cost-awareness, security, and compliance built in from line one.**
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v020)
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v030)
 
 </div>
 
@@ -55,7 +55,7 @@ asyncio.run(main())
 
 ---
 
-## What's shipped (v0.2.0)
+## What's shipped (v0.3.0)
 
 An honest snapshot of what works today versus what is on the way. Everything marked
 **Shipped** is implemented, typed, and covered by the test suite.
@@ -81,7 +81,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Conversation memory + in-memory RAG vector store | Shipped |
 | Durable memory backend (SQLite, persistent RAG, no vector extension) | Shipped |
 | CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
-| 47 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
+| 77 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backends (pgvector, Redis) | Planned |
 | Bedrock / Vertex providers | Planned |
 | Policy-as-code for tool governance | Planned |
@@ -418,7 +418,7 @@ ruff check .      # lint
 mypy forge        # strict type-check
 ```
 
-The entire 47-test suite runs offline against the deterministic provider — fast,
+The entire 77-test suite runs offline against the deterministic provider — fast,
 hermetic, and free. CI runs the same checks (ruff, ruff format, mypy strict, pytest)
 on Python 3.11, 3.12, and 3.13.
 
