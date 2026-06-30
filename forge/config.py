@@ -131,6 +131,11 @@ class ForgeConfig(BaseModel):
     otel_endpoint: str | None = None
     #: ``service.name`` resource attribute reported to the OTel backend.
     otel_service_name: str = "forge"
+    #: AWS region for the Bedrock provider (from ``AWS_REGION`` / ``BEDROCK_REGION``,
+    #: defaulting to ``us-east-1``); ``None`` lets boto3 resolve the region itself.
+    bedrock_region: str | None = None
+    #: AWS named profile for the Bedrock provider (from ``AWS_PROFILE``).
+    bedrock_profile: str | None = None
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> ForgeConfig:
@@ -179,6 +184,12 @@ class ForgeConfig(BaseModel):
             self.otel_endpoint = otel_ep
         if (otel_sn := os.environ.get("FORGE_OTEL_SERVICE_NAME")) is not None:
             self.otel_service_name = otel_sn
+
+        self.bedrock_region = (
+            os.environ.get("AWS_REGION") or os.environ.get("BEDROCK_REGION") or "us-east-1"
+        )
+        if (aws_profile := os.environ.get("AWS_PROFILE")) is not None:
+            self.bedrock_profile = aws_profile
 
         if (level := os.environ.get("FORGE_LOG_LEVEL")) is not None:
             self.observability.log_level = level

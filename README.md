@@ -68,6 +68,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | OpenAI provider (gpt-4o-mini, gpt-4o, gpt-4.1, o3) | Shipped |
 | Offline deterministic provider (zero config, no API key) | Shipped |
 | Ollama provider (local models, zero cost, no API key, auto-detected) | Shipped |
+| Amazon Bedrock provider (Claude/Llama/Mistral via Converse, in-account/GovCloud) | Shipped |
 | Pre-flight + per-step budget caps | Shipped |
 | Tool sandboxing (allowlist/denylist, timeouts, dangerous-denied-by-default) | Shipped |
 | RBAC (admin / operator / developer / viewer) | Shipped |
@@ -83,7 +84,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
 | 77 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backends (pgvector, Redis) | Planned |
-| Bedrock / Vertex providers | Planned |
+| Vertex / other cloud providers | Planned |
 | Policy-as-code for tool governance | Planned |
 | Hosted SaaS control plane (TypeScript / Next.js) | Future |
 
@@ -176,6 +177,7 @@ pip install agentforge-oss                       # core (works offline, zero con
 pip install "agentforge-oss[anthropic]"          # + Claude provider
 pip install "agentforge-oss[openai]"             # + OpenAI / GPT provider
 pip install "agentforge-oss[anthropic,openai]"   # both real providers
+pip install "agentforge-oss[bedrock]"            # + Amazon Bedrock provider (boto3)
 pip install "agentforge-oss[all,dev]"            # everything + test/lint tooling
 ```
 
@@ -325,7 +327,7 @@ Every layer is swappable:
 
 | Layer | Default | Swap in… |
 |---|---|---|
-| Provider | Echo (offline), Anthropic, OpenAI, Ollama | Any `ModelProvider` (Bedrock, Vertex, …) |
+| Provider | Echo (offline), Anthropic, OpenAI, Ollama, Bedrock | Any `ModelProvider` (Vertex, …) |
 | Routing | `balanced` strategy | Your own strategy / `fixed` model |
 | Memory | InMemoryVectorStore (default), SQLiteMemoryStore | Any `Memory` backend (pgvector, Redis, …) |
 | Tools | `calculator`, `utc_now` | Any `@tool` function |

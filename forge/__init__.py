@@ -69,6 +69,7 @@ from forge.models import (
 )
 from forge.models.providers import (
     AnthropicProvider,
+    BedrockProvider,
     EchoProvider,
     OllamaProvider,
     OpenAIProvider,
@@ -136,6 +137,7 @@ __all__ = [
     "AnthropicProvider",
     "OpenAIProvider",
     "OllamaProvider",
+    "BedrockProvider",
     "Tool",
     "tool",
     "ToolRegistry",

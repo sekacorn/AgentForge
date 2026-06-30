@@ -30,6 +30,7 @@ from forge.config import ForgeConfig
 from forge.exceptions import ConfigurationError, ForgeError
 from forge.models.base import ModelProvider
 from forge.models.providers.anthropic import AnthropicProvider
+from forge.models.providers.bedrock import BedrockProvider
 from forge.models.providers.echo import EchoProvider
 from forge.models.providers.ollama import OllamaProvider
 from forge.models.providers.openai import OpenAIProvider
@@ -277,6 +278,14 @@ class Orchestrator:
                 providers["openai"] = OpenAIProvider(api_key=openai_key)
             except (ForgeError, ImportError) as exc:
                 self._log.warning("OpenAI provider unavailable: %s", exc)
+        if self._aws_credentials_available():
+            try:
+                providers["bedrock"] = BedrockProvider(
+                    region_name=self.config.bedrock_region,
+                    profile_name=self.config.bedrock_profile,
+                )
+            except (ForgeError, ImportError) as exc:
+                self._log.warning("Bedrock provider unavailable: %s", exc)
         if self._should_offer_ollama():
             try:
                 providers["ollama"] = OllamaProvider(base_url=self.config.ollama_base_url)
@@ -304,12 +313,31 @@ class Orchestrator:
         except Exception:  # noqa: BLE001 - any failure just means "not available"
             return False
 
+    def _aws_credentials_available(self) -> bool:
+        """Whether AWS credentials resolve for the Bedrock provider.
+
+        Configuring AWS credentials is a deliberate signal, so Bedrock outranks the
+        local Ollama probe. The check is lazy and never makes boto3 a hard
+        dependency: if boto3 is not installed it simply returns False.
+        """
+        try:
+            import boto3
+        except ImportError:
+            return False
+        try:
+            session = boto3.Session(
+                region_name=self.config.bedrock_region, profile_name=self.config.bedrock_profile
+            )
+            return session.get_credentials() is not None
+        except Exception:  # noqa: BLE001 - any failure just means "not available"
+            return False
+
     def _apply_default_provider(self) -> None:
         """Choose a default provider so real work is not shadowed by free echo models.
 
-        Precedence: explicit user config > Anthropic > OpenAI > Ollama > Echo. The
-        chosen provider's cheapest model is used for the lightweight planning pass;
-        echo stays available as the offline fallback.
+        Precedence: explicit user config > Anthropic > OpenAI > Bedrock > Ollama >
+        Echo. The chosen provider's cheapest model is used for the lightweight
+        planning pass; echo stays available as the offline fallback.
         """
         routing = self.config.routing
         if routing.default_provider is not None or routing.allow_providers is not None:
@@ -319,6 +347,8 @@ class Orchestrator:
             default_provider, cheapest = "anthropic", "claude-haiku-4-5"
         elif "openai" in available:
             default_provider, cheapest = "openai", "gpt-4o-mini"
+        elif "bedrock" in available:
+            default_provider, cheapest = "bedrock", "anthropic.claude-3-5-haiku-20241022-v1:0"
         elif "ollama" in available:
             default_provider, cheapest = "ollama", "llama3.2:3b"
         else:

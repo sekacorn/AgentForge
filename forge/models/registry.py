@@ -254,6 +254,65 @@ def _default_models() -> list[ModelInfo]:
             supports_thinking=True,
             description="Local DeepSeek-R1 reasoning model (no tool calling; pull first).",
         ),
+        # -- Amazon Bedrock (Converse API) --------------------------------- #
+        # Models run inside the customer's own AWS account/region via boto3.
+        # Prices reflect typical us-east-1 list pricing and may vary by region —
+        # this is a known limitation; Forge does not fetch live Bedrock pricing.
+        ModelInfo(
+            name="anthropic.claude-3-5-haiku-20241022-v1:0",
+            provider="bedrock",
+            tier=ModelTier.SMALL,
+            context_window=200_000,
+            max_output_tokens=8_192,
+            input_cost_per_mtok=0.80,
+            output_cost_per_mtok=4.00,
+            supports_tools=True,
+            description="Claude 3.5 Haiku on Bedrock: fast, low-cost in-account model.",
+        ),
+        ModelInfo(
+            name="anthropic.claude-3-5-sonnet-20241022-v2:0",
+            provider="bedrock",
+            tier=ModelTier.MEDIUM,
+            context_window=200_000,
+            max_output_tokens=8_192,
+            input_cost_per_mtok=3.00,
+            output_cost_per_mtok=15.00,
+            supports_tools=True,
+            description="Claude 3.5 Sonnet on Bedrock: balanced in-account model.",
+        ),
+        ModelInfo(
+            name="meta.llama3-1-70b-instruct-v1:0",
+            provider="bedrock",
+            tier=ModelTier.MEDIUM,
+            context_window=128_000,
+            max_output_tokens=4_096,
+            input_cost_per_mtok=0.72,
+            output_cost_per_mtok=0.72,
+            supports_tools=True,
+            description="Llama 3.1 70B on Bedrock: open-weight in-account model.",
+        ),
+        ModelInfo(
+            name="meta.llama3-1-405b-instruct-v1:0",
+            provider="bedrock",
+            tier=ModelTier.LARGE,
+            context_window=128_000,
+            max_output_tokens=4_096,
+            input_cost_per_mtok=2.40,
+            output_cost_per_mtok=2.40,
+            supports_tools=True,
+            description="Llama 3.1 405B on Bedrock: largest open-weight in-account model.",
+        ),
+        ModelInfo(
+            name="mistral.mistral-large-2407-v1:0",
+            provider="bedrock",
+            tier=ModelTier.MEDIUM,
+            context_window=128_000,
+            max_output_tokens=8_192,
+            input_cost_per_mtok=2.00,
+            output_cost_per_mtok=6.00,
+            supports_tools=True,
+            description="Mistral Large on Bedrock: capable in-account model.",
+        ),
     ]
 
 
