@@ -466,7 +466,7 @@ ruff check .      # lint
 mypy forge        # strict type-check
 ```
 
-The entire 83-test suite runs offline against the deterministic provider — fast,
+The entire 115-test suite runs offline against the deterministic provider — fast,
 hermetic, and free. CI runs the same checks (ruff, ruff format, mypy strict, pytest)
 on Python 3.11, 3.12, and 3.13.
 
