@@ -18,7 +18,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from forge.exceptions import ConfigurationError
 
@@ -115,11 +115,11 @@ class ForgeConfig(BaseModel):
     compliance: ComplianceConfig = Field(default_factory=ComplianceConfig)
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
     #: Provider name -> API key. Populated from the environment by default.
-    api_keys: dict[str, str] = Field(default_factory=dict)
+    api_keys: dict[str, SecretStr] = Field(default_factory=dict)
     #: Base URL of a local Ollama server (overridable via ``OLLAMA_BASE_URL``). The
     #: orchestrator offers the Ollama provider when this is set explicitly or when a
     #: server is reachable here; see ``Orchestrator._build_default_providers``.
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: SecretStr = SecretStr("http://localhost:11434")
     #: Retrieval-memory backend (see ``forge.memory.build_memory``). ``"sqlite"``
     #: persists RAG state across restarts and needs the optional ``aiosqlite`` extra.
     memory_backend: MemoryBackend = "inmemory"
@@ -169,10 +169,10 @@ class ForgeConfig(BaseModel):
         ):
             value = os.environ.get(env_name)
             if value:
-                self.api_keys[provider] = value
+                self.api_keys[provider] = SecretStr(value)
 
         if (ollama_url := os.environ.get("OLLAMA_BASE_URL")) is not None:
-            self.ollama_base_url = ollama_url
+            self.ollama_base_url = SecretStr(ollama_url)
 
         if (backend := os.environ.get("FORGE_MEMORY_BACKEND")) is not None:
             self.memory_backend = backend  # type: ignore[assignment]
@@ -212,14 +212,15 @@ class ForgeConfig(BaseModel):
 
     def api_key_for(self, provider: str) -> str | None:
         """Return the configured API key for ``provider``, if any."""
-        return self.api_keys.get(provider)
+        secret = self.api_keys.get(provider)
+        return secret.get_secret_value() if secret is not None else None
 
     @property
     def anthropic_api_key(self) -> str | None:
         """The Anthropic API key, if configured (from ``ANTHROPIC_API_KEY``)."""
-        return self.api_keys.get("anthropic")
+        return self.api_key_for("anthropic")
 
     @property
     def openai_api_key(self) -> str | None:
         """The OpenAI API key, if configured (from ``OPENAI_API_KEY``)."""
-        return self.api_keys.get("openai")
+        return self.api_key_for("openai")

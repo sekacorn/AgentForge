@@ -288,7 +288,9 @@ class Orchestrator:
                 self._log.warning("Bedrock provider unavailable: %s", exc)
         if self._should_offer_ollama():
             try:
-                providers["ollama"] = OllamaProvider(base_url=self.config.ollama_base_url)
+                providers["ollama"] = OllamaProvider(
+                    base_url=self.config.ollama_base_url.get_secret_value()
+                )
             except (ForgeError, ImportError) as exc:
                 self._log.warning("Ollama provider unavailable: %s", exc)
         return providers
@@ -302,7 +304,7 @@ class Orchestrator:
         """
         if os.environ.get("OLLAMA_BASE_URL"):
             return True
-        return self._ollama_reachable(self.config.ollama_base_url)
+        return self._ollama_reachable(self.config.ollama_base_url.get_secret_value())
 
     @staticmethod
     def _ollama_reachable(base_url: str) -> bool:
