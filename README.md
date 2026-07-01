@@ -12,7 +12,7 @@ with cost-awareness, security, and compliance built in from line one.**
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v040)
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v050)
 
 </div>
 
@@ -55,7 +55,7 @@ asyncio.run(main())
 
 ---
 
-## What's shipped (v0.4.0)
+## What's shipped (v0.5.0)
 
 An honest snapshot of what works today versus what is on the way. Everything marked
 **Shipped** is implemented, typed, and covered by the test suite.
@@ -82,8 +82,9 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Conversation memory + in-memory RAG vector store | Shipped |
 | Durable memory backend (SQLite, persistent RAG, no vector extension) | Shipped |
 | CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
-| 83 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
-| Durable memory backends (pgvector, Redis) | Planned |
+| 115 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
+| Durable memory backend (pgvector, PostgreSQL + IVFFlat ANN, asyncpg) | Shipped |
+| Durable memory backends (Redis) | Planned |
 | Vertex / other cloud providers | Planned |
 | Policy-as-code governance (deny / approve / log rules, human-in-the-loop gates) | Shipped |
 | Hosted SaaS control plane (TypeScript / Next.js) | Future |
@@ -134,6 +135,8 @@ An honest snapshot of what works today versus what is on the way. Everything mar
   JSON-Schema generated automatically from your type hints and docstring.
 - **Pluggable memory.** Short-term conversation memory plus a dependency-free
   in-memory vector store for RAG — swap in any backend behind one tiny interface.
+  Three durable backends ship in the box: in-memory (default), SQLite (zero
+  extension), and pgvector (PostgreSQL + IVFFlat ANN for production-scale RAG).
 - **Provider-agnostic core.** Anthropic (Claude), OpenAI (GPT / o-series), Amazon
   Bedrock (Converse API), and Ollama (local models, zero cost) ship in the box
   alongside a deterministic offline echo provider; add any provider by implementing
@@ -197,6 +200,7 @@ pip install "agentforge-oss[anthropic]"          # + Claude provider
 pip install "agentforge-oss[openai]"             # + OpenAI / GPT provider
 pip install "agentforge-oss[anthropic,openai]"   # both real providers
 pip install "agentforge-oss[bedrock]"            # + Amazon Bedrock provider (boto3)
+pip install "agentforge-oss[pgvector]"           # + PostgreSQL RAG (asyncpg + pgvector)
 pip install "agentforge-oss[all,dev]"            # everything + test/lint tooling
 ```
 
@@ -310,6 +314,27 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+### Durable RAG with PostgreSQL + pgvector
+
+```python
+import asyncio
+from forge import PGVectorMemoryStore
+
+async def main() -> None:
+    dsn = "postgresql://forge:forge@localhost:5432/forge"
+    async with PGVectorMemoryStore(dsn) as store:
+        await store.add("Forge routes cheap tasks to small models to save cost.")
+        await store.add("The audit log is hash-chained and tamper-evident.")
+        hits = await store.search("how does Forge keep costs down?", k=1)
+        print(hits[0].text)   # -> the cost-routing fact
+
+asyncio.run(main())
+```
+
+Requires `pip install "agentforge-oss[pgvector]"` and a PostgreSQL instance with the
+`vector` extension. Set `FORGE_MEMORY_BACKEND=pgvector` and `FORGE_PGVECTOR_DSN` in
+your environment to wire it into the orchestrator automatically.
+
 See [`examples/`](examples/) for runnable end-to-end scripts, including enterprise
 governance (RBAC + budgets + audit verification).
 
@@ -350,7 +375,7 @@ Every layer is swappable:
 |---|---|---|
 | Provider | Echo (offline), Anthropic, OpenAI, Ollama, Bedrock | Any `ModelProvider` (Vertex, …) |
 | Routing | `balanced` strategy | Your own strategy / `fixed` model |
-| Memory | InMemoryVectorStore (default), SQLiteMemoryStore | Any `Memory` backend (pgvector, Redis, …) |
+| Memory | InMemoryVectorStore (default), SQLiteMemoryStore, PGVectorMemoryStore | Any `Memory` backend (Redis, ...) |
 | Tools | `calculator`, `utc_now` | Any `@tool` function |
 | Audit | Hash-chained JSONL | Forward events to your SIEM via the event bus |
 
@@ -456,7 +481,7 @@ the core typed (`mypy --strict`) and tested.
 
 - **New model provider** (Google Vertex, Gemini, Cohere, Mistral) — implement one method. See forge/models/providers/anthropic.py as the reference.
 - **New built-in tool** (web search, file read, database query).
-- **Durable memory backend** (pgvector, Redis) — SQLite ships in the box already; pgvector and Redis are the next backends behind the same Memory interface.
+- **Durable memory backend** (Redis) — SQLite and pgvector ship in the box already; Redis is the next backend behind the same Memory interface.
 - **Routing strategy** (a custom cost/quality tradeoff).
 - **Example workflows** that show Forge solving a real business problem.
 
