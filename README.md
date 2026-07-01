@@ -75,7 +75,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Prompt-injection heuristics + input sanitization | Shipped |
 | SHA-256 hash-chained tamper-evident audit log | Shipped |
 | PII redaction (emails, cards, SSNs, IPs, phones) | Shipped |
-| Event bus (21 lifecycle event types) | Shipped |
+| Event bus (25 lifecycle event types) | Shipped |
 | Streaming token output through the event bus (`stream=True`) | Shipped |
 | Per-run cost reporting (tokens + USD, per model, per agent) | Shipped |
 | OpenTelemetry export (traces + metrics: console or OTLP to Jaeger/Grafana/Datadog) | Shipped |
@@ -85,7 +85,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | 83 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backends (pgvector, Redis) | Planned |
 | Vertex / other cloud providers | Planned |
-| Policy-as-code for tool governance | Planned |
+| Policy-as-code governance (deny / approve / log rules, human-in-the-loop gates) | Shipped |
 | Hosted SaaS control plane (TypeScript / Next.js) | Future |
 
 ---
@@ -152,9 +152,27 @@ An honest snapshot of what works today versus what is on the way. Everything mar
   chain — and `forge audit` detects it.
 - **PII redaction** of logs and audit records (emails, cards, SSNs, IPs, phones).
 - **Data-residency & retention** hints recorded on every entry for GDPR/SOC 2 stories.
+- **Policy-as-code governance.** Define rules that evaluate before any tool call
+  executes. Three actions: `deny` (hard block), `approve` (human-in-the-loop gate),
+  or `log` (audit without blocking). Rules are plain Python -- composable, testable,
+  version-controllable.
+
+```python
+from forge import PolicyRule, PolicySet
+
+policy = PolicySet()
+policy.add(PolicyRule(
+    name="require-approval-for-network",
+    description="Any network call requires human sign-off",
+    tool_names=["http_get"],
+    condition=lambda name, args: True,
+    action="approve",
+    approver=my_approval_webhook,  # async fn returning bool
+))
+```
 
 ### Observability built in
-- A structured **event bus** emits **21 distinct lifecycle event types** — run, agent,
+- A structured **event bus** emits **25 distinct lifecycle event types** — run, agent,
   and worker start/finish (including `WORKER_STARTED` and `WORKER_FAILED` for parallel
   execution), model routing and calls, tool calls, budget thresholds, and security
   violations — so any subscriber (console, audit, metrics) sees the same stream.

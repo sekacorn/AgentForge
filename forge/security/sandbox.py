@@ -18,12 +18,16 @@ add behind the same interface.
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from forge.config import SecurityConfig
 from forge.exceptions import ToolError
 from forge.observability.events import EventBus, EventType
 from forge.tools.base import Tool
 from forge.types import ToolCall, ToolResult
+
+if TYPE_CHECKING:
+    from forge.governance.policy import PolicySet
 
 
 class ToolSandbox:
@@ -34,9 +38,11 @@ class ToolSandbox:
         config: SecurityConfig | None = None,
         *,
         events: EventBus | None = None,
+        policy_set: PolicySet | None = None,
     ) -> None:
         self._config = config or SecurityConfig()
         self._events = events
+        self._policy_set = policy_set
 
     def is_allowed(self, tool: Tool) -> tuple[bool, str | None]:
         """Decide whether ``tool`` may run. Returns ``(allowed, reason_if_not)``."""
@@ -71,6 +77,31 @@ class ToolSandbox:
                 content=f"Denied by policy: {reason}.",
                 is_error=True,
             )
+
+        if self._policy_set is not None:
+            decision = await self._policy_set.evaluate(call.name, call.arguments)
+            event_type = {
+                "approved": EventType.POLICY_APPROVED,
+                "denied": EventType.POLICY_DENIED,
+                "logged": EventType.POLICY_LOGGED,
+                "allowed": EventType.POLICY_EVALUATED,
+            }.get(decision.action_taken, EventType.POLICY_EVALUATED)
+            self._emit(
+                event_type,
+                run_id,
+                agent,
+                tool=call.name,
+                rule=decision.rule_name,
+                action=decision.action_taken,
+                reason=decision.reason,
+            )
+            if not decision.allowed:
+                return ToolResult(
+                    tool_call_id=call.id,
+                    name=call.name,
+                    content=f"Denied by policy: {decision.reason}",
+                    is_error=True,
+                )
 
         self._emit(
             EventType.TOOL_CALL_STARTED, run_id, agent, tool=tool.name, arguments=call.arguments

@@ -51,6 +51,7 @@ from forge.exceptions import (
     ToolTimeoutError,
     ToolValidationError,
 )
+from forge.governance import PolicyDecision, PolicyRule, PolicySet
 from forge.memory import (
     ConversationMemory,
     InMemoryVectorStore,
@@ -184,4 +185,7 @@ __all__ = [
     "SecurityError",
     "PromptInjectionError",
     "AccessDeniedError",
+    "PolicyRule",
+    "PolicySet",
+    "PolicyDecision",
 ]

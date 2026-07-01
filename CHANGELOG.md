@@ -8,6 +8,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Policy-as-code governance: PolicyRule, PolicySet, PolicyDecision -- define deny/approve/log rules evaluated before every tool call
+- Human-in-the-loop approval gates: async approver callbacks pause execution for human sign-off
+- Four new event types: POLICY_EVALUATED, POLICY_APPROVED, POLICY_DENIED, POLICY_LOGGED
+- New example: examples/policy_governance.py
+
 ## [0.4.0] — 2026-06-30
 
 ### Added

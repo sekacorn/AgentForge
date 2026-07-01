@@ -48,6 +48,10 @@ class EventType(enum.StrEnum):
     BUDGET_WARNING = "budget.warning"
     BUDGET_EXCEEDED = "budget.exceeded"
     SECURITY_VIOLATION = "security.violation"
+    POLICY_EVALUATED = "policy.evaluated"
+    POLICY_APPROVED = "policy.approved"
+    POLICY_DENIED = "policy.denied"
+    POLICY_LOGGED = "policy.logged"
 
 
 EventHandler = Callable[["Event"], None]

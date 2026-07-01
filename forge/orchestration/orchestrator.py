@@ -28,6 +28,7 @@ from forge.compliance.audit import AuditLogger
 from forge.compliance.redaction import PIIRedactor
 from forge.config import ForgeConfig
 from forge.exceptions import ConfigurationError, ForgeError
+from forge.governance.policy import PolicySet
 from forge.models.base import ModelProvider
 from forge.models.providers.anthropic import AnthropicProvider
 from forge.models.providers.bedrock import BedrockProvider
@@ -131,6 +132,7 @@ class Orchestrator:
         model: str | None = None,
         principal: Principal | None = None,
         stream: bool = False,
+        policy_set: PolicySet | None = None,
     ) -> RunResult:
         """Run ``goal`` to completion and return a :class:`RunResult`.
 
@@ -158,13 +160,18 @@ class Orchestrator:
 
         run_id = new_id("run")
         usage = UsageTracker()
+        sandbox = (
+            ToolSandbox(self.config.security, events=self.events, policy_set=policy_set)
+            if policy_set is not None
+            else self.sandbox
+        )
         ctx = RunContext(
             run_id=run_id,
             config=self.config,
             registry=self.registry,
             router=self.router,
             providers=self.providers,
-            sandbox=self.sandbox,
+            sandbox=sandbox,
             usage=usage,
             events=self.events,
             audit=self.audit,
