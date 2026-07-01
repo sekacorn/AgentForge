@@ -12,6 +12,7 @@ with cost-awareness, security, and compliance built in from line one.**
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://sekacorn.github.io/AgentForge/)
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v050)
 
 </div>

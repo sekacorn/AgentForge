@@ -1,0 +1,79 @@
+site_name: Forge
+site_description: The open-source multi-agent orchestration platform for teams that ship.
+site_url: https://sekacorn.github.io/AgentForge/
+repo_url: https://github.com/sekacorn/AgentForge
+repo_name: sekacorn/AgentForge
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+    - Installation: getting-started/installation.md
+    - Quickstart: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Guides:
+    - Providers: guides/providers.md
+    - Memory & RAG: guides/memory.md
+    - Tools: guides/tools.md
+    - Governance: guides/governance.md
+    - Observability: guides/observability.md
+  - Examples:
+    - Overview: examples/index.md
+    - Custom tools: examples/custom-tools.md
+    - Parallel supervisor: examples/parallel-supervisor.md
+    - Persistent RAG: examples/persistent-rag.md
+    - Policy governance: examples/policy-governance.md
+    - OpenTelemetry: examples/otel-tracing.md
+  - Reference:
+    - API reference: reference/api.md
+    - Configuration reference: reference/configuration.md
+    - Changelog: reference/changelog.md
+  - Contributing: contributing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/sekacorn/AgentForge
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/agentforge-oss/
