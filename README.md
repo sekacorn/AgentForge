@@ -186,6 +186,8 @@ pip install "agentforge-oss[all,dev]"            # everything + test/lint toolin
 > The import is still `import forge`. This follows the same convention as
 > `pip install Pillow` then `import PIL`.
 
+> **Model names:** Forge uses registry aliases (e.g. `claude-sonnet-4-6`, `gpt-4o`) that map to provider model IDs in `forge/models/registry.py`. Aliases can be updated as provider IDs change without touching your code. Run `forge models` to see the full registry with current aliases, tiers, and pricing.
+
 > Forge runs **fully offline** out of the box using a deterministic echo provider, so
 > you can explore the whole platform — routing, tools, supervision, audit — without an
 > API key. Set `ANTHROPIC_API_KEY` to route automatically to Claude, or `OPENAI_API_KEY`
