@@ -57,6 +57,7 @@ from forge.memory import (
     InMemoryVectorStore,
     Memory,
     MemoryItem,
+    PGVectorMemoryStore,
     SQLiteMemoryStore,
 )
 from forge.models import (
@@ -150,6 +151,7 @@ __all__ = [
     "MemoryItem",
     "ConversationMemory",
     "InMemoryVectorStore",
+    "PGVectorMemoryStore",
     "SQLiteMemoryStore",
     "Event",
     "EventBus",

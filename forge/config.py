@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, SecretStr
 from forge.exceptions import ConfigurationError
 
 RoutingStrategy = Literal["balanced", "cost_optimized", "quality_first", "fixed"]
-MemoryBackend = Literal["inmemory", "sqlite"]
+MemoryBackend = Literal["inmemory", "sqlite", "pgvector"]
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -125,6 +125,8 @@ class ForgeConfig(BaseModel):
     memory_backend: MemoryBackend = "inmemory"
     #: Database file path for the SQLite memory backend.
     memory_path: str = "forge_memory.db"
+    #: PostgreSQL DSN for the pgvector memory backend (from ``FORGE_PGVECTOR_DSN``).
+    pgvector_dsn: str | None = None
     #: Export traces + metrics via OpenTelemetry (needs the optional ``otel`` extra).
     otel_enabled: bool = False
     #: OTLP endpoint (e.g. ``http://localhost:4317``); ``None`` exports to the console.
@@ -178,6 +180,8 @@ class ForgeConfig(BaseModel):
             self.memory_backend = backend  # type: ignore[assignment]
         if (mem_path := os.environ.get("FORGE_MEMORY_PATH")) is not None:
             self.memory_path = mem_path
+        if (pg_dsn := os.environ.get("FORGE_PGVECTOR_DSN")) is not None:
+            self.pgvector_dsn = pg_dsn
 
         self.otel_enabled = _env_bool("FORGE_OTEL_ENABLED", self.otel_enabled)
         if (otel_ep := os.environ.get("FORGE_OTEL_ENDPOINT")) is not None:
