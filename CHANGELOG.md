@@ -11,6 +11,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Maintenance
 - Consolidated git commit authorship under a single maintainer identity (`sekacorn`).
 
+## [0.5.2] — 2026-07-07
+
+### Release infrastructure
+- Reconnected release metadata for the recreated `sekacorn/AgentForge` repository.
+- Updated package metadata to publish public author identity as `sekacorn`.
+- Restored the dedicated GitHub Actions release workflow for PyPI Trusted Publishing.
+- Added distribution validation and artifact handoff before publishing.
+
+### Documentation
+- Replaced stale version-specific shipped-feature wording with current release language.
+
 ## [0.5.1] — 2026-07-05
 
 ### Added

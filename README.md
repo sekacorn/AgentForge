@@ -13,7 +13,7 @@ with cost-awareness, security, and compliance built in from line one.**
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://sekacorn.github.io/AgentForge/)
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-shipped-v050)
+[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-currently-shipped)
 
 </div>
 
@@ -56,7 +56,7 @@ asyncio.run(main())
 
 ---
 
-## What's shipped (v0.5.0)
+## What's currently shipped
 
 An honest snapshot of what works today versus what is on the way. Everything marked
 **Shipped** is implemented, typed, and covered by the test suite.

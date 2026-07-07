@@ -31,6 +31,7 @@ _ASYNCPG_MISSING = (
 )
 
 _TOKEN = re.compile(r"[a-z0-9]+")
+_SQL_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 
 def _tokenize(text: str) -> list[str]:
@@ -42,12 +43,23 @@ def _stable_bucket(token: str, dim: int) -> int:
     return int.from_bytes(digest, "big") % dim
 
 
+def _quote_identifier(identifier: str) -> str:
+    if _SQL_IDENTIFIER.fullmatch(identifier) is None:
+        raise ValueError(
+            "PostgreSQL identifiers must start with a letter or underscore and "
+            "contain only letters, numbers, and underscores."
+        )
+    return f'"{identifier}"'
+
+
 class PGVectorMemoryStore(Memory):
     """A durable cosine-similarity store backed by PostgreSQL + pgvector."""
 
     def __init__(self, dsn: str, *, table: str = "forge_memories", embedding_dim: int = 64) -> None:
         self._dsn = dsn
         self._table = table
+        self._table_sql = _quote_identifier(table)
+        self._index_sql = _quote_identifier(f"{table}_embedding_idx")
         self._dim = embedding_dim
         self._pool: Any = None
 
@@ -75,8 +87,9 @@ class PGVectorMemoryStore(Memory):
         async with self._pool.acquire() as conn:
             await register_vector(conn)
             await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            # SQL identifiers are validated and quoted before interpolation.
             await conn.execute(
-                f"CREATE TABLE IF NOT EXISTS {self._table} ("
+                f"CREATE TABLE IF NOT EXISTS {self._table_sql} ("  # nosec B608
                 f"  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
                 f"  text TEXT NOT NULL,"
                 f"  embedding vector({self._dim}),"
@@ -86,8 +99,8 @@ class PGVectorMemoryStore(Memory):
             )
             # lists=100 is appropriate for up to ~1M rows; tune for larger datasets
             await conn.execute(
-                f"CREATE INDEX IF NOT EXISTS {self._table}_embedding_idx "
-                f"ON {self._table} USING ivfflat (embedding vector_cosine_ops) "
+                f"CREATE INDEX IF NOT EXISTS {self._index_sql} "  # nosec B608
+                f"ON {self._table_sql} USING ivfflat (embedding vector_cosine_ops) "
                 f"WITH (lists = 100)"
             )
         return self
@@ -102,7 +115,7 @@ class PGVectorMemoryStore(Memory):
         meta_json = json.dumps(metadata) if metadata is not None else None
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
-                f"INSERT INTO {self._table} (text, embedding, metadata) "
+                f"INSERT INTO {self._table_sql} (text, embedding, metadata) "  # nosec B608
                 f"VALUES ($1, $2, $3::jsonb) RETURNING id",
                 text,
                 embedding,
@@ -116,9 +129,9 @@ class PGVectorMemoryStore(Memory):
         query_vector = self._embed(query)
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
-                f"SELECT id, text, metadata, "
+                f"SELECT id, text, metadata, "  # nosec B608
                 f"1 - (embedding <=> $1::vector) AS similarity "
-                f"FROM {self._table} "
+                f"FROM {self._table_sql} "
                 f"ORDER BY embedding <=> $1::vector "
                 f"LIMIT $2",
                 query_vector,
@@ -140,7 +153,7 @@ class PGVectorMemoryStore(Memory):
 
     async def clear(self) -> None:
         async with self._pool.acquire() as conn:
-            await conn.execute(f"DELETE FROM {self._table}")
+            await conn.execute(f"DELETE FROM {self._table_sql}")  # nosec B608
 
     async def aclose(self) -> None:
         """Close the connection pool. Safe to call more than once."""

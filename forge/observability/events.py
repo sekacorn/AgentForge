@@ -39,9 +39,10 @@ class EventType(enum.StrEnum):
     MODEL_CALL_FINISHED = "model.call.finished"
     MODEL_CALL_FAILED = "model.call.failed"
     MODEL_ROUTED = "model.routed"
-    TOKEN_STREAM_START = "token.stream.start"
-    TOKEN_CHUNK = "token.chunk"
-    TOKEN_STREAM_END = "token.stream.end"
+    # These are lifecycle event names, not credentials.
+    TOKEN_STREAM_START = "token.stream.start"  # nosec B105
+    TOKEN_CHUNK = "token.chunk"  # nosec B105
+    TOKEN_STREAM_END = "token.stream.end"  # nosec B105
     TOOL_CALL_STARTED = "tool.call.started"
     TOOL_CALL_FINISHED = "tool.call.finished"
     TOOL_CALL_FAILED = "tool.call.failed"

@@ -177,6 +177,11 @@ async def test_custom_table_and_dim() -> None:
     assert len(vec) == 128
 
 
+def test_invalid_table_name_is_rejected() -> None:
+    with pytest.raises(ValueError, match="PostgreSQL identifiers"):
+        PGVectorMemoryStore("postgresql://test", table="bad; DROP TABLE memories")
+
+
 def test_import_error_message() -> None:
     from forge.memory.pgvector import _ASYNCPG_MISSING
 

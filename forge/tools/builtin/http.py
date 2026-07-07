@@ -21,7 +21,15 @@ _MAX_BYTES = 20_000
 #: does not defeat DNS rebinding, alternate IP encodings, or other private ranges —
 #: operators allowlisting this tool should still enforce network egress controls.
 _BLOCKED_HOSTS = frozenset(
-    {"localhost", "127.0.0.1", "0.0.0.0", "::1", "169.254.169.254", "metadata.google.internal"}
+    {
+        "localhost",
+        "127.0.0.1",
+        # Blocked host literal, not a bind address.
+        "0.0.0.0",  # nosec B104
+        "::1",
+        "169.254.169.254",
+        "metadata.google.internal",
+    }
 )
 
 

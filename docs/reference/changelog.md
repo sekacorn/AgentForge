@@ -8,6 +8,28 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Maintenance
+- Consolidated git commit authorship under a single maintainer identity (`sekacorn`).
+
+## [0.5.2] -- 2026-07-07
+
+### Release infrastructure
+- Reconnected release metadata for the recreated `sekacorn/AgentForge` repository.
+- Updated package metadata to publish public author identity as `sekacorn`.
+- Restored the dedicated GitHub Actions release workflow for PyPI Trusted Publishing.
+- Added distribution validation and artifact handoff before publishing.
+
+### Documentation
+- Replaced stale version-specific shipped-feature wording with current release language.
+
+## [0.5.1] -- 2026-07-05
+
+### Added
+- PGVectorMemoryStore: durable RAG backend using PostgreSQL + pgvector with IVFFlat ANN indexing (cosine distance), asyncpg connection pool
+- FORGE_PGVECTOR_DSN config for PostgreSQL connection string
+- New extra: `pip install "agentforge-oss[pgvector]"` (asyncpg + pgvector-python)
+- New example: examples/rag_pgvector.py
+
 ## [0.5.0] -- 2026-07-01
 
 ### Added
@@ -15,10 +37,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Human-in-the-loop approval gates: async approver callbacks pause execution for human sign-off
 - Four new event types: POLICY_EVALUATED, POLICY_APPROVED, POLICY_DENIED, POLICY_LOGGED
 - New example: examples/policy_governance.py
-- PGVectorMemoryStore: durable RAG backend using PostgreSQL + pgvector with IVFFlat ANN indexing (cosine distance), asyncpg connection pool
-- FORGE_PGVECTOR_DSN config for PostgreSQL connection string
-- New extra: `pip install "agentforge-oss[pgvector]"` (asyncpg + pgvector-python)
-- New example: examples/rag_pgvector.py
 
 ## [0.4.0] -- 2026-06-30
 
