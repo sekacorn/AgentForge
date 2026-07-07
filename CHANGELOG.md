@@ -8,6 +8,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Maintenance
+- Consolidated git commit authorship under a single maintainer identity (`sekacorn`).
+
 ## [0.5.1] — 2026-07-05
 
 ### Added
