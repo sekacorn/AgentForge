@@ -9,7 +9,7 @@ with cost-awareness, security, and compliance built in from line one.**
 
 [![CI](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml/badge.svg)](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agentforge-oss.svg)](https://pypi.org/project/agentforge-oss/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://sekacorn.github.io/AgentForge/)
@@ -488,5 +488,5 @@ the core typed (`mypy --strict`) and tested.
 
 ## License
 
-[MIT](LICENSE) — free for commercial and private use. Build something that multiplies
+[Apache License 2.0](LICENSE) — free for commercial and private use. Build something that multiplies
 your team.
