@@ -18,10 +18,9 @@ peers are never cancelled.
 import asyncio
 from forge import Orchestrator, ForgeConfig, BudgetConfig
 
+
 async def main() -> None:
-    config = ForgeConfig(
-        budget=BudgetConfig(max_workers=3, max_usd_per_run=0.25)
-    )
+    config = ForgeConfig(budget=BudgetConfig(max_workers=3, max_usd_per_run=0.25))
     async with Orchestrator(config) as forge:
         result = await forge.run(
             "Summarize our product, draft a pricing page, and write an FAQ",
@@ -29,6 +28,7 @@ async def main() -> None:
         )
         print(result.output)
         print(result.usage.format_table())
+
 
 asyncio.run(main())
 ```

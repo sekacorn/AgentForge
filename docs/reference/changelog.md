@@ -8,7 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-08-06
+
 ### Maintenance
+- Publish corrected Apache-2.0 package metadata under the public maintainer identity `sekacorn`.
 - Consolidated git commit authorship under a single maintainer identity (`sekacorn`).
 
 ## [0.5.2] -- 2026-07-07

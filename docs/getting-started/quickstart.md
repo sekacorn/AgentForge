@@ -36,6 +36,7 @@ forge audit
 import asyncio
 from forge import Orchestrator
 
+
 async def main() -> None:
     async with Orchestrator() as forge:
         result = await forge.run(
@@ -43,6 +44,7 @@ async def main() -> None:
         )
         print(result.output)
         print(result.usage.format_table())
+
 
 asyncio.run(main())
 ```
@@ -60,6 +62,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 import asyncio
 from forge import Orchestrator
 
+
 async def main() -> None:
     async with Orchestrator() as forge:
         result = await forge.run(
@@ -68,6 +71,7 @@ async def main() -> None:
         )
         print(result.output)
         print(result.usage.format_table())
+
 
 asyncio.run(main())
 ```
@@ -91,6 +95,7 @@ ollama pull llama3.1:8b
 import asyncio
 from forge import Orchestrator
 
+
 async def main() -> None:
     async with Orchestrator() as forge:
         result = await forge.run(
@@ -98,6 +103,7 @@ async def main() -> None:
             mode="single",
         )
         print(result.output)
+
 
 asyncio.run(main())
 ```
@@ -113,6 +119,7 @@ cost, fully air-gapped.
 import asyncio
 from forge import Orchestrator, ToolRegistry, calculator, tool
 
+
 @tool
 def fx_convert(amount: float, rate: float) -> float:
     """Convert an amount using an FX rate.
@@ -123,6 +130,7 @@ def fx_convert(amount: float, rate: float) -> float:
     """
     return round(amount * rate, 2)
 
+
 async def main() -> None:
     tools = ToolRegistry([calculator, fx_convert])
     async with Orchestrator() as forge:
@@ -132,6 +140,7 @@ async def main() -> None:
             tools=tools,
         )
         print(result.output)
+
 
 asyncio.run(main())
 ```

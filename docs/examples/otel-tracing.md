@@ -9,6 +9,7 @@ up a real OTel collector.
 import asyncio
 from forge import ForgeConfig, Orchestrator
 
+
 async def main() -> None:
     config = ForgeConfig(
         otel_enabled=True,
@@ -22,6 +23,7 @@ async def main() -> None:
         print(result.output)
         print(result.usage.format_table())
         print("\nSpans exported above (ConsoleSpanExporter).")
+
 
 asyncio.run(main())
 ```

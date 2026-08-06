@@ -15,6 +15,7 @@ restarts -- no external infrastructure needed.
 import asyncio
 from forge.memory.sqlite import SQLiteMemoryStore
 
+
 async def main() -> None:
     async with SQLiteMemoryStore("demo_memory.db") as store:
         count_before = len(await store.search("forge", k=100))
@@ -29,6 +30,7 @@ async def main() -> None:
             hits = await store.search("how does Forge reduce cost?", k=2)
             for hit in hits:
                 print(f"  [{hit.score:.3f}] {hit.text}")
+
 
 asyncio.run(main())
 ```

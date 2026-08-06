@@ -40,16 +40,18 @@ features — not afterthoughts you bolt on before launch.
 import asyncio
 from forge import Orchestrator
 
+
 async def main() -> None:
     # Zero config. Runs fully offline with the deterministic echo provider, and
     # automatically uses Claude or GPT when an API key is present in the environment.
     async with Orchestrator() as forge:
         result = await forge.run(
             "Research our top 3 competitors, draft a comparison, and compute Q3 growth at 18%",
-            mode="supervisor",   # spawns parallel workers, one per subtask
+            mode="supervisor",  # spawns parallel workers, one per subtask
         )
         print(result.output)
-        print(result.usage.format_table())   # tokens + cost, per model and per agent
+        print(result.usage.format_table())  # tokens + cost, per model and per agent
+
 
 asyncio.run(main())
 ```
@@ -165,14 +167,16 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 from forge import PolicyRule, PolicySet
 
 policy = PolicySet()
-policy.add(PolicyRule(
-    name="require-approval-for-network",
-    description="Any network call requires human sign-off",
-    tool_names=["http_get"],
-    condition=lambda name, args: True,
-    action="approve",
-    approver=my_approval_webhook,  # async fn returning bool
-))
+policy.add(
+    PolicyRule(
+        name="require-approval-for-network",
+        description="Any network call requires human sign-off",
+        tool_names=["http_get"],
+        condition=lambda name, args: True,
+        action="approve",
+        approver=my_approval_webhook,  # async fn returning bool
+    )
+)
 ```
 
 ### Observability built in
@@ -257,6 +261,7 @@ call, run tools in the sandbox, and tally cost in real time.
 import asyncio
 from forge import Orchestrator, ToolRegistry, tool, calculator
 
+
 @tool
 def fx_convert(amount: float, rate: float) -> float:
     """Convert an amount using an FX rate.
@@ -266,6 +271,7 @@ def fx_convert(amount: float, rate: float) -> float:
         rate: The exchange rate to apply.
     """
     return round(amount * rate, 2)
+
 
 async def main() -> None:
     tools = ToolRegistry([calculator, fx_convert])
@@ -277,6 +283,7 @@ async def main() -> None:
         )
         print(result.output)
 
+
 asyncio.run(main())
 ```
 
@@ -285,6 +292,7 @@ asyncio.run(main())
 ```python
 import asyncio
 from forge import Orchestrator, ForgeConfig, BudgetConfig
+
 
 async def main() -> None:
     config = ForgeConfig(budget=BudgetConfig(max_workers=3, max_usd_per_run=0.25))
@@ -296,6 +304,7 @@ async def main() -> None:
         print(result.output)
         print(result.usage.format_table())
 
+
 asyncio.run(main())
 ```
 
@@ -305,12 +314,14 @@ asyncio.run(main())
 import asyncio
 from forge import InMemoryVectorStore
 
+
 async def main() -> None:
     store = InMemoryVectorStore()
     await store.add("Forge routes cheap tasks to small models to save cost.")
     await store.add("The audit log is hash-chained and tamper-evident.")
     hits = await store.search("how does Forge keep costs down?", k=1)
-    print(hits[0].text)   # -> the cost-routing fact
+    print(hits[0].text)  # -> the cost-routing fact
+
 
 asyncio.run(main())
 ```
@@ -321,13 +332,15 @@ asyncio.run(main())
 import asyncio
 from forge import PGVectorMemoryStore
 
+
 async def main() -> None:
     dsn = "postgresql://forge:forge@localhost:5432/forge"
     async with PGVectorMemoryStore(dsn) as store:
         await store.add("Forge routes cheap tasks to small models to save cost.")
         await store.add("The audit log is hash-chained and tamper-evident.")
         hits = await store.search("how does Forge keep costs down?", k=1)
-        print(hits[0].text)   # -> the cost-routing fact
+        print(hits[0].text)  # -> the cost-routing fact
+
 
 asyncio.run(main())
 ```

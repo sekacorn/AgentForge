@@ -8,6 +8,7 @@ an agent tool via `@tool`.
 ```python
 from forge import tool
 
+
 @tool
 def fx_convert(amount: float, rate: float) -> float:
     """Convert an amount of money using an exchange rate.
@@ -29,6 +30,7 @@ two float parameters and a description it can reason about.
 import asyncio
 from forge import Orchestrator, ToolRegistry, calculator, tool
 
+
 @tool
 def fx_convert(amount: float, rate: float) -> float:
     """Convert an amount of money using an exchange rate.
@@ -38,6 +40,7 @@ def fx_convert(amount: float, rate: float) -> float:
         rate: The exchange rate to apply.
     """
     return round(amount * rate, 2)
+
 
 async def main() -> None:
     tools = ToolRegistry([calculator, fx_convert])
@@ -50,6 +53,7 @@ async def main() -> None:
     print(result.output)
     print()
     print(result.usage.format_table())
+
 
 asyncio.run(main())
 ```

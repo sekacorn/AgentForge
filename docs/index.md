@@ -20,6 +20,7 @@ provider. No API key, no network, no configuration.
 import asyncio
 from forge import Orchestrator
 
+
 async def main() -> None:
     async with Orchestrator() as forge:
         result = await forge.run(
@@ -28,6 +29,7 @@ async def main() -> None:
         )
         print(result.output)
         print(result.usage.format_table())
+
 
 asyncio.run(main())
 ```

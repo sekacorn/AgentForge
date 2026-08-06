@@ -33,6 +33,7 @@ Claude Haiku 4.5, Sonnet 4.6, Opus 4.8, and Fable 5.
 
 ```python
 import os
+
 os.environ["ANTHROPIC_API_KEY"] = "sk-ant-..."
 
 from forge import Orchestrator
@@ -61,6 +62,7 @@ GPT-4o-mini, GPT-4o, GPT-4.1, and o3.
 
 ```python
 import os
+
 os.environ["OPENAI_API_KEY"] = "sk-..."
 
 from forge import Orchestrator
@@ -153,6 +155,7 @@ Implement the `ModelProvider` abstract base class:
 
 ```python
 from forge.models import ModelProvider, ModelResponse, ModelInfo
+
 
 class MyProvider(ModelProvider):
     @property

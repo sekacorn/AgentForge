@@ -60,13 +60,15 @@ from forge import PolicyRule, PolicySet
 policy = PolicySet()
 
 # Hard deny: block a specific tool unconditionally
-policy.add(PolicyRule(
-    name="block-calculator",
-    description="Calculator is blocked by policy",
-    tool_names=["calculator"],
-    condition=lambda name, args: True,
-    action="deny",
-))
+policy.add(
+    PolicyRule(
+        name="block-calculator",
+        description="Calculator is blocked by policy",
+        tool_names=["calculator"],
+        condition=lambda name, args: True,
+        action="deny",
+    )
+)
 ```
 
 ### Human-in-the-loop approval
@@ -74,31 +76,37 @@ policy.add(PolicyRule(
 ```python
 from typing import Any
 
+
 async def my_approver(tool_name: str, args: dict[str, Any]) -> bool:
     # Call your approval webhook, Slack bot, or manual review queue
     print(f"Approve {tool_name} with {args}? (auto-approving)")
     return True
 
-policy.add(PolicyRule(
-    name="require-approval-for-network",
-    description="Any network call requires human sign-off",
-    tool_names=["http_get"],
-    condition=lambda name, args: True,
-    action="approve",
-    approver=my_approver,
-))
+
+policy.add(
+    PolicyRule(
+        name="require-approval-for-network",
+        description="Any network call requires human sign-off",
+        tool_names=["http_get"],
+        condition=lambda name, args: True,
+        action="approve",
+        approver=my_approver,
+    )
+)
 ```
 
 ### Audit logging without blocking
 
 ```python
-policy.add(PolicyRule(
-    name="log-all-tools",
-    description="Log every tool call for audit",
-    tool_names=["*"],
-    condition=lambda name, args: True,
-    action="log",
-))
+policy.add(
+    PolicyRule(
+        name="log-all-tools",
+        description="Log every tool call for audit",
+        tool_names=["*"],
+        condition=lambda name, args: True,
+        action="log",
+    )
+)
 ```
 
 The wildcard `"*"` matches any tool name.

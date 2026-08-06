@@ -13,6 +13,7 @@ Turn any typed Python function into an agent tool:
 ```python
 from forge import tool
 
+
 @tool
 def fx_convert(amount: float, rate: float) -> float:
     """Convert an amount of money using an exchange rate.
@@ -46,6 +47,7 @@ Pass tools to the orchestrator via a `ToolRegistry`:
 ```python
 from forge import Orchestrator, ToolRegistry, calculator, tool
 
+
 @tool
 def my_tool(x: int) -> int:
     """Double a number.
@@ -54,6 +56,7 @@ def my_tool(x: int) -> int:
         x: The number to double.
     """
     return x * 2
+
 
 tools = ToolRegistry([calculator, my_tool])
 
@@ -134,9 +137,7 @@ add them to the security allowlist:
 ```python
 from forge import ForgeConfig, SecurityConfig
 
-config = ForgeConfig(
-    security=SecurityConfig(allow_tools=["write_file", "http_get"])
-)
+config = ForgeConfig(security=SecurityConfig(allow_tools=["write_file", "http_get"]))
 ```
 
 Or via environment / forge.toml:
@@ -167,9 +168,7 @@ events on the event bus.
 Configure the per-tool timeout globally:
 
 ```python
-config = ForgeConfig(
-    security=SecurityConfig(tool_timeout_seconds=60)
-)
+config = ForgeConfig(security=SecurityConfig(tool_timeout_seconds=60))
 ```
 
 Or via environment:

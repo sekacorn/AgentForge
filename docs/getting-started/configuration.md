@@ -104,5 +104,5 @@ Or load from file + environment:
 
 ```python
 config = ForgeConfig.load("forge.toml")  # file + env overlay
-config = ForgeConfig.from_env()          # env only, no file
+config = ForgeConfig.from_env()  # env only, no file
 ```

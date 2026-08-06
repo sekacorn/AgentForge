@@ -47,8 +47,10 @@ same stream without producers knowing who is listening.
 ```python
 from forge import Orchestrator, Event
 
+
 def my_handler(event: Event) -> None:
     print(f"[{event.type.value}] agent={event.agent} data={event.data}")
+
 
 async with Orchestrator() as forge:
     forge.subscribe(my_handler)

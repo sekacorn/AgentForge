@@ -26,7 +26,7 @@ await store.add("Forge routes cheap tasks to small models to save cost.")
 await store.add("The audit log is hash-chained and tamper-evident.")
 
 hits = await store.search("how does Forge keep costs down?", k=1)
-print(hits[0].text)   # -> the cost-routing fact
+print(hits[0].text)  # -> the cost-routing fact
 ```
 
 ### How it works
@@ -161,6 +161,7 @@ All backends implement the `Memory` ABC:
 
 ```python
 from forge.memory.base import Memory, MemoryItem
+
 
 class Memory(ABC):
     async def add(self, text: str, *, metadata: dict | None = None) -> str: ...

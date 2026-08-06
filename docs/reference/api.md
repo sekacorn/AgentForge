@@ -132,6 +132,7 @@ The interface for all memory backends.
 ```python
 from forge.memory.base import Memory, MemoryItem
 
+
 class Memory(ABC):
     async def add(self, text: str, *, metadata: dict | None = None) -> str: ...
     async def search(self, query: str, *, k: int = 5) -> list[MemoryItem]: ...
@@ -162,6 +163,7 @@ The interface for adding new LLM providers.
 ```python
 from forge.models import ModelProvider
 
+
 class ModelProvider(ABC):
     @property
     def name(self) -> str: ...
@@ -188,6 +190,7 @@ Turn a typed Python function into an agent tool:
 
 ```python
 from forge import tool
+
 
 @tool
 def my_function(x: int, y: int) -> int:
