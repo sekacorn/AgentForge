@@ -85,7 +85,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Conversation memory + in-memory RAG vector store | Shipped |
 | Durable memory backend (SQLite, persistent RAG, no vector extension) | Shipped |
 | CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
-| 115 tests, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
+| Offline-focused test suite, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backend (pgvector, PostgreSQL + IVFFlat ANN, asyncpg) | Shipped |
 | Durable memory backends (Redis) | Planned |
 | Vertex / other cloud providers | Planned |
@@ -480,9 +480,9 @@ ruff check .      # lint
 mypy forge        # strict type-check
 ```
 
-The entire 115-test suite runs offline against the deterministic provider — fast,
-hermetic, and free. CI runs the same checks (ruff, ruff format, mypy strict, pytest)
-on Python 3.11, 3.12, and 3.13.
+The test suite uses the deterministic provider for offline coverage; tests for
+optional backends run when their extras are installed. CI runs Ruff, Ruff format,
+mypy strict, and pytest on Python 3.11, 3.12, and 3.13.
 
 ---
 
