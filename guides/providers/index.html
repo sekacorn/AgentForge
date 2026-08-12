@@ -22,7 +22,7 @@
 <a id=__codelineno-3-2 name=__codelineno-3-2 href=#__codelineno-3-2></a>ollama<span class=w> </span>pull<span class=w> </span>llama3.1:8b
 </code></pre></div> <div class=highlight><pre><span></span><code><a id=__codelineno-4-1 name=__codelineno-4-1 href=#__codelineno-4-1></a><span class=kn>from</span><span class=w> </span><span class=nn>forge</span><span class=w> </span><span class=kn>import</span> <span class=n>Orchestrator</span>
 <a id=__codelineno-4-2 name=__codelineno-4-2 href=#__codelineno-4-2></a>
-<a id=__codelineno-4-3 name=__codelineno-4-3 href=#__codelineno-4-3></a><span class=c1># Forge auto-detects Ollama at localhost:11434</span>
+<a id=__codelineno-4-3 name=__codelineno-4-3 href=#__codelineno-4-3></a><span class=c1># Set OLLAMA_BASE_URL to opt in to local Ollama routing.</span>
 <a id=__codelineno-4-4 name=__codelineno-4-4 href=#__codelineno-4-4></a><span class=k>async</span> <span class=k>with</span> <span class=n>Orchestrator</span><span class=p>()</span> <span class=k>as</span> <span class=n>forge</span><span class=p>:</span>
 <a id=__codelineno-4-5 name=__codelineno-4-5 href=#__codelineno-4-5></a>    <span class=n>result</span> <span class=o>=</span> <span class=k>await</span> <span class=n>forge</span><span class=o>.</span><span class=n>run</span><span class=p>(</span><span class=s2>&quot;Summarize the benefits of local inference&quot;</span><span class=p>)</span>
 </code></pre></div> <p>To point at a remote Ollama server:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-5-1 name=__codelineno-5-1 href=#__codelineno-5-1></a><span class=nb>export</span><span class=w> </span><span class=nv>OLLAMA_BASE_URL</span><span class=o>=</span><span class=s2>&quot;http://my-gpu-box:11434&quot;</span>
