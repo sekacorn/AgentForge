@@ -8,6 +8,50 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-08-12
+
+Beta-hardening release. No new product features; imports, public API and CLI
+commands are unchanged. One intentional behavior tightening is called out under
+Changed below.
+
+### Security & governance
+- `ToolSandbox` now enforces tool RBAC against the run principal: normal tools
+  require `USE_TOOL` and dangerous tools require `USE_DANGEROUS_TOOL`.
+- Dangerous tools require **both** the `USE_DANGEROUS_TOOL` permission **and**
+  explicit allowlisting before they may run.
+
+### Budget reliability
+- Added concurrent pre-call budget reservations (conservative input + maximum
+  output) held under a lock, reducing the risk of parallel workers collectively
+  oversubscribing a hard cap. Reservations settle against provider-reported
+  usage on success and are released on failure — no permanent reservation leak
+  and no double-counting. Costs remain local list-price estimates, not invoices.
+
+### Audit reliability
+- Redact actor and run identifiers (in addition to resource values) before
+  writing audit records.
+- Serialize in-process audit writes per audit file; `verify()` fails closed on
+  malformed/unparseable records. Multi-process audit-file coordination remains a
+  known limitation. Hash chains are tamper-evident, not immutable.
+
+### Configuration
+- Stricter validation: reject unknown configuration fields, malformed boolean
+  environment values, non-positive tool timeouts, and invalid assignment.
+
+### CLI
+- Added `forge --version` / `forge -V`. The existing `forge version` command is
+  unchanged.
+
+### Packaging
+- Declare supported Python as `>=3.11,<3.14`.
+- Pin the PyPI Trusted Publishing action to `pypa/gh-action-pypi-publish`
+  v1.14.2 (Twine 7 / Core Metadata 2.5 compatible).
+
+### Changed
+- **Ollama is no longer auto-detected.** Zero-configuration runs stay
+  deterministic and offline (Echo). To enable the Ollama provider, set
+  `OLLAMA_BASE_URL` explicitly (for a local or remote server).
+
 ## [0.5.3] - 2026-08-06
 
 ### Maintenance
