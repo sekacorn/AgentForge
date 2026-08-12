@@ -155,3 +155,18 @@ async def test_auto_selects_ollama_when_base_url_set(tmp_path, monkeypatch) -> N
         assert orchestrator.config.routing.planner_model == "llama3.2:3b"
     finally:
         await orchestrator.aclose()
+
+
+async def test_reachable_ollama_does_not_override_offline_default(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    config = ForgeConfig()
+    config.compliance.audit_path = str(tmp_path / "audit.jsonl")
+    orchestrator = Orchestrator(config)
+    try:
+        assert "ollama" not in orchestrator.providers
+        assert orchestrator.config.routing.default_provider is None
+        assert orchestrator.router.route().provider == "echo"
+    finally:
+        await orchestrator.aclose()

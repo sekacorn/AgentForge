@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.11 or later
+- Python 3.11, 3.12, or 3.13
 - pip (any recent version)
 
 ## Install from PyPI
@@ -58,8 +58,7 @@ ollama serve
 ollama pull llama3.1:8b
 ```
 
-Forge auto-detects a running Ollama server at `localhost:11434`. To point at a
-different host:
+Set `OLLAMA_BASE_URL` to opt in to Ollama. To point at a local or different host:
 
 ```bash
 export OLLAMA_BASE_URL="http://my-gpu-box:11434"

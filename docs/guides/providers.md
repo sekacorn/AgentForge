@@ -96,7 +96,7 @@ ollama pull llama3.1:8b
 ```python
 from forge import Orchestrator
 
-# Forge auto-detects Ollama at localhost:11434
+# Set OLLAMA_BASE_URL to opt in to local Ollama routing.
 async with Orchestrator() as forge:
     result = await forge.run("Summarize the benefits of local inference")
 ```

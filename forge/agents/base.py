@@ -103,6 +103,12 @@ class BaseAgent(abc.ABC):
         provider = ctx.provider_for(decision.model)
         info = ctx.registry.get(decision.model)
         max_tokens = min(self.max_tokens, info.max_output_tokens)
+        reservation = await ctx.reserve_model_call(
+            model_name=decision.model,
+            messages=messages,
+            tools=tools,
+            max_output_tokens=max_tokens,
+        )
 
         ctx.events.emit(
             EventType.MODEL_CALL_STARTED,
@@ -121,6 +127,7 @@ class BaseAgent(abc.ABC):
                     messages, model=decision.model, tools=tools, max_tokens=max_tokens
                 )
         except Exception as exc:
+            await ctx.release_model_call(reservation)
             # Surface model/provider failures on the event stream (symmetric with
             # tool failures) before letting the error propagate and be audited.
             ctx.events.emit(
@@ -134,7 +141,9 @@ class BaseAgent(abc.ABC):
 
         # Pricing is resolved centrally from the registry, never the provider.
         response.usage.cost_usd = info.cost(response.usage)
-        ctx.usage.record(response.usage, agent=self.name, model=decision.model)
+        await ctx.record_model_call(
+            reservation, response.usage, agent=self.name, model=decision.model
+        )
 
         ctx.events.emit(
             EventType.MODEL_CALL_FINISHED,

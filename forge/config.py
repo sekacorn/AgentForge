@@ -18,7 +18,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from forge.exceptions import ConfigurationError
 
@@ -30,7 +30,14 @@ def _env_bool(name: str, default: bool) -> bool:
     raw = os.environ.get(name)
     if raw is None:
         return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigurationError(
+        f"{name} must be a boolean value (true/false, yes/no, or 1/0), got {raw!r}"
+    )
 
 
 def _env_float(name: str) -> float | None:
@@ -58,6 +65,8 @@ class RoutingConfig(BaseModel):
     #: this from the available API keys when it is not set explicitly.
     default_provider: str | None = None
 
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
 
 class BudgetConfig(BaseModel):
     """Hard limits that keep an autonomous run from running away with spend."""
@@ -70,19 +79,23 @@ class BudgetConfig(BaseModel):
     #: Also bounds parallelism: subtasks run in concurrent batches of this size.
     max_workers: int = Field(default=5, ge=1)
 
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
 
 class SecurityConfig(BaseModel):
     """Guardrails applied to inputs and tool execution."""
 
     detect_prompt_injection: bool = True
     #: Inputs longer than this are rejected before reaching a model.
-    max_input_chars: int = 200_000
+    max_input_chars: int = Field(default=200_000, ge=1)
     #: Per-tool execution timeout in seconds.
-    tool_timeout_seconds: float = 30.0
+    tool_timeout_seconds: float = Field(default=30.0, gt=0)
     #: If set, only these tools may run (allowlist). ``None`` means "all".
     allow_tools: list[str] | None = None
     #: Tools that may never run (denylist), checked after the allowlist.
     block_tools: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
 
 class ComplianceConfig(BaseModel):
@@ -97,6 +110,8 @@ class ComplianceConfig(BaseModel):
     #: Optional retention window, surfaced to operators (enforcement is external).
     retention_days: int | None = None
 
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
 
 class ObservabilityConfig(BaseModel):
     """Logging and tracing behaviour."""
@@ -104,6 +119,8 @@ class ObservabilityConfig(BaseModel):
     log_level: str = "INFO"
     #: Emit logs as JSON lines (recommended for production log aggregation).
     json_logs: bool = False
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
 
 class ForgeConfig(BaseModel):
@@ -117,8 +134,8 @@ class ForgeConfig(BaseModel):
     #: Provider name -> API key. Populated from the environment by default.
     api_keys: dict[str, SecretStr] = Field(default_factory=dict)
     #: Base URL of a local Ollama server (overridable via ``OLLAMA_BASE_URL``). The
-    #: orchestrator offers the Ollama provider when this is set explicitly or when a
-    #: server is reachable here; see ``Orchestrator._build_default_providers``.
+    #: orchestrator offers the Ollama provider when ``OLLAMA_BASE_URL`` is set
+    #: explicitly; see ``Orchestrator._build_default_providers``.
     ollama_base_url: SecretStr = SecretStr("http://localhost:11434")
     #: Retrieval-memory backend (see ``forge.memory.build_memory``). ``"sqlite"``
     #: persists RAG state across restarts and needs the optional ``aiosqlite`` extra.
@@ -138,6 +155,8 @@ class ForgeConfig(BaseModel):
     bedrock_region: str | None = None
     #: AWS named profile for the Bedrock provider (from ``AWS_PROFILE``).
     bedrock_profile: str | None = None
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> ForgeConfig:

@@ -10,7 +10,7 @@ with cost-awareness, security, and compliance built in from line one.**
 [![CI](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml/badge.svg)](https://github.com/sekacorn/AgentForge/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agentforge-oss.svg)](https://pypi.org/project/agentforge-oss/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Python 3.11-3.13](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](https://www.python.org/)
 [![Typed](https://img.shields.io/badge/typed-mypy%20strict-blue.svg)](pyproject.toml)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://sekacorn.github.io/AgentForge/)
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#whats-currently-shipped)
@@ -70,7 +70,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | Anthropic provider (Claude Haiku 4.5, Sonnet 4.6, Opus 4.8, Fable 5) | Shipped |
 | OpenAI provider (gpt-4o-mini, gpt-4o, gpt-4.1, o3) | Shipped |
 | Offline deterministic provider (zero config, no API key) | Shipped |
-| Ollama provider (local models, zero cost, no API key, auto-detected) | Shipped |
+| Ollama provider (local models, zero cost, no API key, explicit opt-in) | Shipped |
 | Amazon Bedrock provider (Claude/Llama/Mistral via Converse, in-account/GovCloud) | Shipped |
 | Pre-flight + per-step budget caps | Shipped |
 | Tool sandboxing (allowlist/denylist, timeouts, dangerous-denied-by-default) | Shipped |
@@ -101,7 +101,7 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | One prompt, one answer, no division of labor | A supervisor decomposes the goal and delegates to specialized workers |
 | Workers run one at a time | Workers run in parallel — with a pre-flight budget check before any of them start |
 | Every call hits your most expensive model | Intelligent routing sends easy work to cheap models, hard work to frontier models |
-| Cost is a surprise on the invoice | Cost is tracked per run, per agent, per model — with hard budget caps |
+| Cost is a surprise on the invoice | Cost is tracked per run, per agent, per model — with pre-call budget reservations |
 | Tools run with full trust | Tools run sandboxed, with side-effecting tools **denied by default** |
 | "Trust me, it worked" | A tamper-evident, hash-chained audit trail of every action |
 | Prototype you can't ship | A typed, tested core designed for production |
@@ -130,8 +130,10 @@ An honest snapshot of what works today versus what is on the way. Everything mar
   GPT-4.1, o3) and computes spend consistently.
 - **Budgets that bite — twice.** A pessimistic *pre-flight* check estimates the
   worst-case spend of a worker batch and refuses to start it if that would blow the
-  remaining budget. A precise, real-time check then fires after every model call.
-  Together they bound both over-spend and wasted API calls.
+  remaining budget. Before every model call, Forge also reserves conservative input
+  and maximum-output headroom, including across parallel workers; provider-reported
+  usage is checked after completion. Pricing is a local list-price estimate, not an
+  invoice guarantee.
 
 ### Tools, memory & RAG — extensible by design
 - **`@tool` decorator** turns any typed Python function into an agent tool, with
@@ -222,8 +224,8 @@ pip install "agentforge-oss[all,dev]"            # everything + test/lint toolin
 > (configurable).
 
 > **Ollama support is built in** — no extra install needed (it uses `httpx`, already a
-> core dependency, so there is no `[ollama]` extra). Just run Ollama locally and Forge
-> auto-detects it (or set `OLLAMA_BASE_URL` for a custom/remote server):
+> core dependency, so there is no `[ollama]` extra). Set `OLLAMA_BASE_URL` to opt in to
+> using a local or remote Ollama server, then pull a model present in Forge's registry:
 
 ```bash
 ollama serve
@@ -430,6 +432,8 @@ questions already have answers.
 > Forge gives you strong application-level controls. It is not a substitute for OS-
 > level isolation when executing untrusted code — for that, run tools in a container
 > or microVM behind the same `ToolSandbox` interface. The design makes that a drop-in.
+> Audit writes are serialized for logger instances in the same process; coordinating
+> multiple processes that share one audit file remains an operator responsibility.
 
 ---
 

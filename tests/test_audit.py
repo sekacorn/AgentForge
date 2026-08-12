@@ -33,7 +33,12 @@ def test_tampering_breaks_the_chain(tmp_path) -> None:
 def test_pii_is_redacted_before_write(tmp_path) -> None:
     path = tmp_path / "audit.jsonl"
     log = AuditLogger(path, redactor=PIIRedactor(enabled=True))
-    log.record("note", actor="sys", detail="reach me at alice@example.com")
+    log.record(
+        "note",
+        actor="alice@example.com",
+        run_id="run-alice@example.com",
+        detail="reach me at alice@example.com",
+    )
     content = path.read_text(encoding="utf-8")
     assert "alice@example.com" not in content
     assert "REDACTED:EMAIL" in content

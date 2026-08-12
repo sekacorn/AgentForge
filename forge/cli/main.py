@@ -50,6 +50,27 @@ app = typer.Typer(
 console = Console()
 
 
+def _show_version(value: bool) -> None:
+    """Print the installed version for the eager root CLI option."""
+    if value:
+        console.print(f"Forge (AgentForge) v{__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        callback=_show_version,
+        is_eager=True,
+        help="Show the installed Forge version and exit.",
+    ),
+) -> None:
+    """Forge command-line interface."""
+
+
 @app.command()
 def run(
     goal: str = typer.Argument(..., help="The goal to accomplish, in plain language."),

@@ -68,7 +68,7 @@ features -- not afterthoughts you bolt on before launch.
 | One prompt, one answer, no division of labor | A supervisor decomposes the goal and delegates to specialized workers |
 | Workers run one at a time | Workers run in parallel -- with a pre-flight budget check before any of them start |
 | Every call hits your most expensive model | Intelligent routing sends easy work to cheap models, hard work to frontier models |
-| Cost is a surprise on the invoice | Cost is tracked per run, per agent, per model -- with hard budget caps |
+| Cost is a surprise on the invoice | Cost is tracked per run, per agent, per model -- with pre-call budget reservations |
 | Tools run with full trust | Tools run sandboxed, with side-effecting tools **denied by default** |
 | "Trust me, it worked" | A tamper-evident, hash-chained audit trail of every action |
 | Prototype you can't ship | A typed, tested core designed for production |

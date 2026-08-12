@@ -64,6 +64,25 @@ async def test_sandbox_denies_and_returns_error_result() -> None:
     assert "Denied by policy" in result.content
 
 
+async def test_sandbox_enforces_tool_permissions() -> None:
+    access = AccessController()
+    developer = Principal(id="developer", roles=frozenset({"developer"}))
+    sandbox = ToolSandbox(
+        SecurityConfig(allow_tools=["calculator", "http_get"]), access=access, principal=developer
+    )
+
+    safe_result = await sandbox.run(
+        calculator, ToolCall(name="calculator", arguments={"expression": "2+2"})
+    )
+    dangerous_result = await sandbox.run(
+        http_get, ToolCall(name="http_get", arguments={"url": "http://example.com"})
+    )
+
+    assert not safe_result.is_error
+    assert dangerous_result.is_error
+    assert "use_dangerous_tool" in dangerous_result.content
+
+
 def test_rbac_gates_permissions() -> None:
     access = AccessController()
     admin = Principal.system()

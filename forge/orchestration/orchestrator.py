@@ -19,7 +19,6 @@ import os
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Literal
 
-import httpx
 from pydantic import BaseModel
 
 from forge.agents.agent import Agent
@@ -94,7 +93,11 @@ class Orchestrator:
             self.registry, self.config.routing, available_providers=set(self.providers)
         )
         self.events = EventBus()
-        self.sandbox = ToolSandbox(self.config.security, events=self.events)
+        self.access = access or AccessController()
+        self.principal = principal or Principal.system()
+        self.sandbox = ToolSandbox(
+            self.config.security, events=self.events, access=self.access, principal=self.principal
+        )
         self.redactor = PIIRedactor(self.config.compliance.redact_pii)
         self.audit = AuditLogger(
             self.config.compliance.audit_path,
@@ -103,8 +106,6 @@ class Orchestrator:
             redactor=self.redactor,
         )
         self.sanitizer = InputSanitizer(self.config.security)
-        self.access = access or AccessController()
-        self.principal = principal or Principal.system()
         self.default_tools = (
             self._resolve_tools(tools) if tools is not None else ToolRegistry(list(SAFE_TOOLS))
         )
@@ -161,9 +162,17 @@ class Orchestrator:
         run_id = new_id("run")
         usage = UsageTracker()
         sandbox = (
-            ToolSandbox(self.config.security, events=self.events, policy_set=policy_set)
+            ToolSandbox(
+                self.config.security,
+                events=self.events,
+                policy_set=policy_set,
+                access=self.access,
+                principal=actor,
+            )
             if policy_set is not None
-            else self.sandbox
+            else ToolSandbox(
+                self.config.security, events=self.events, access=self.access, principal=actor
+            )
         )
         ctx = RunContext(
             run_id=run_id,
@@ -269,8 +278,8 @@ class Orchestrator:
         """Always provide the offline echo provider; add Anthropic/OpenAI/Ollama.
 
         Anthropic and OpenAI are added when their API keys are present. Ollama is
-        added when ``OLLAMA_BASE_URL`` is set explicitly or a local server is
-        reachable (a short, best-effort probe that never blocks startup).
+        added only when ``OLLAMA_BASE_URL`` is set explicitly, keeping a
+        zero-configuration run deterministic and independent of local models.
         """
         providers: dict[str, ModelProvider] = {"echo": EchoProvider()}
         anthropic_key = self.config.api_key_for("anthropic")
@@ -305,22 +314,11 @@ class Orchestrator:
     def _should_offer_ollama(self) -> bool:
         """Whether to wire up the Ollama provider for a default build.
 
-        Setting ``OLLAMA_BASE_URL`` is an explicit opt-in (a remote/custom server
-        the user clearly wants). Otherwise, probe the default local server so a
-        running Ollama is picked up automatically.
+        Setting ``OLLAMA_BASE_URL`` is an explicit opt-in. A reachable local
+        service alone must not change a zero-configuration run's provider or
+        require any particular local model to be installed.
         """
-        if os.environ.get("OLLAMA_BASE_URL"):
-            return True
-        return self._ollama_reachable(self.config.ollama_base_url.get_secret_value())
-
-    @staticmethod
-    def _ollama_reachable(base_url: str) -> bool:
-        """Best-effort 1s probe of a local Ollama server. Never blocks startup."""
-        try:
-            response = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=1.0)
-            return response.status_code == 200
-        except Exception:  # noqa: BLE001 - any failure just means "not available"
-            return False
+        return bool(os.environ.get("OLLAMA_BASE_URL"))
 
     def _aws_credentials_available(self) -> bool:
         """Whether AWS credentials resolve for the Bedrock provider.
@@ -358,10 +356,10 @@ class Orchestrator:
             default_provider, cheapest = "openai", "gpt-4o-mini"
         elif "bedrock" in available:
             default_provider, cheapest = "bedrock", "anthropic.claude-3-5-haiku-20241022-v1:0"
-        elif "ollama" in available:
+        elif "ollama" in available and os.environ.get("OLLAMA_BASE_URL"):
             default_provider, cheapest = "ollama", "llama3.2:3b"
         else:
-            return  # echo-only: keep the offline defaults
+            return  # Keep the deterministic offline default without local-model opt-in.
         routing.default_provider = default_provider
         if routing.planner_model is None and self.registry.has(cheapest):
             routing.planner_model = cheapest

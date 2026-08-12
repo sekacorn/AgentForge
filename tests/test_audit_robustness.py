@@ -6,6 +6,8 @@ return ``False`` (its documented contract) rather than raising a ValidationError
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from forge.compliance.audit import AuditLogger
 
 
@@ -21,3 +23,12 @@ def test_verify_returns_false_on_unparseable_line(tmp_path) -> None:
         handle.write("{not valid json at all\n")
 
     assert logger.verify() is False
+
+
+def test_concurrent_threads_preserve_the_audit_chain(tmp_path) -> None:
+    logger = AuditLogger(tmp_path / "audit.jsonl")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda index: logger.record("event", actor=f"worker-{index}"), range(100)))
+
+    assert logger.verify() is True

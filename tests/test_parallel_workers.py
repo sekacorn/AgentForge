@@ -164,4 +164,4 @@ async def test_preflight_budget_blocks_before_workers(tmp_path):
     # The pre-flight guard fired before any worker coroutine started.
     assert EventType.WORKER_STARTED not in seen
     # Only the sequential planning call ran — no worker reached the provider.
-    assert probe.max_active == 1
+    assert probe.max_active == 0

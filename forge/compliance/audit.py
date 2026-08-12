@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,18 @@ from forge.types import new_id, utcnow
 _log = get_logger("audit")
 
 _GENESIS = "0" * 64
+_STATE_LOCK = threading.Lock()
+
+
+@dataclass
+class _AuditLogState:
+    """In-process state shared by loggers targeting one audit file."""
+
+    lock: threading.RLock
+    last_hash: str
+
+
+_LOG_STATES: dict[Path, _AuditLogState] = {}
 
 
 class AuditEntry(BaseModel):
@@ -61,13 +75,13 @@ class AuditLogger:
         redactor: PIIRedactor | None = None,
     ) -> None:
         self.enabled = enabled
-        self.path = Path(path)
+        self.path = Path(path).resolve()
         self._region = region
         self._redactor = redactor
-        self._last_hash = _GENESIS
+        self._state = _AuditLogState(lock=threading.RLock(), last_hash=_GENESIS)
         if self.enabled:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._last_hash = self._read_last_hash()
+            self._state = self._state_for_path(self.path)
 
     def record(
         self,
@@ -87,52 +101,57 @@ class AuditLogger:
         meta = dict(metadata)
         if self._redactor is not None:
             meta = self._redactor.redact_obj(meta)
+            actor = self._redactor.redact(actor)
             if resource is not None:
                 resource = self._redactor.redact(resource)
+            if run_id is not None:
+                run_id = self._redactor.redact(run_id)
 
-        entry = AuditEntry(
-            actor=actor,
-            action=action,
-            resource=resource,
-            run_id=run_id,
-            outcome=outcome,
-            region=self._region,
-            metadata=meta,
-            previous_hash=self._last_hash,
-        )
-        entry.hash = self._compute_hash(entry)
+        with self._state.lock:
+            entry = AuditEntry(
+                actor=actor,
+                action=action,
+                resource=resource,
+                run_id=run_id,
+                outcome=outcome,
+                region=self._region,
+                metadata=meta,
+                previous_hash=self._state.last_hash,
+            )
+            entry.hash = self._compute_hash(entry)
 
-        if self.enabled:
-            with self.path.open("a", encoding="utf-8") as fh:
-                fh.write(entry.model_dump_json() + "\n")
-            self._last_hash = entry.hash
-        return entry
+            if self.enabled:
+                with self.path.open("a", encoding="utf-8") as fh:
+                    fh.write(entry.model_dump_json() + "\n")
+                self._state.last_hash = entry.hash
+            return entry
 
     def verify(self) -> bool:
         """Re-read the log and confirm the hash chain is intact."""
-        if not self.path.exists():
+        with self._state.lock:
+            if not self.path.exists():
+                return True
+            prev = _GENESIS
+            with self.path.open("r", encoding="utf-8") as fh:
+                for line_no, line in enumerate(fh, start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = AuditEntry.model_validate_json(line)
+                    except ValueError:
+                        # A line that no longer parses is itself tampering: fail closed
+                        # (return False) rather than raising out of a bool-returning check.
+                        _log.error("audit chain broken at line %d (unparseable record)", line_no)
+                        return False
+                    if entry.previous_hash != prev:
+                        _log.error("audit chain broken at line %d (prev_hash mismatch)", line_no)
+                        return False
+                    if entry.hash != self._compute_hash(entry):
+                        _log.error("audit chain broken at line %d (hash mismatch)", line_no)
+                        return False
+                    prev = entry.hash
             return True
-        prev = _GENESIS
-        with self.path.open("r", encoding="utf-8") as fh:
-            for line_no, line in enumerate(fh, start=1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = AuditEntry.model_validate_json(line)
-                except ValueError:
-                    # A line that no longer parses is itself tampering: fail closed
-                    # (return False) rather than raising out of a bool-returning check.
-                    _log.error("audit chain broken at line %d (unparseable record)", line_no)
-                    return False
-                if entry.previous_hash != prev:
-                    _log.error("audit chain broken at line %d (prev_hash mismatch)", line_no)
-                    return False
-                if entry.hash != self._compute_hash(entry):
-                    _log.error("audit chain broken at line %d (hash mismatch)", line_no)
-                    return False
-                prev = entry.hash
-        return True
 
     @staticmethod
     def _compute_hash(entry: AuditEntry) -> str:
@@ -141,12 +160,23 @@ class AuditLogger:
         digest.update(entry.signing_payload().encode("utf-8"))
         return digest.hexdigest()
 
-    def _read_last_hash(self) -> str:
-        if not self.path.exists():
+    @classmethod
+    def _state_for_path(cls, path: Path) -> _AuditLogState:
+        """Return the shared in-process state for one normalized audit path."""
+        with _STATE_LOCK:
+            state = _LOG_STATES.get(path)
+            if state is None:
+                state = _AuditLogState(lock=threading.RLock(), last_hash=cls._read_last_hash(path))
+                _LOG_STATES[path] = state
+            return state
+
+    @staticmethod
+    def _read_last_hash(path: Path) -> str:
+        if not path.exists():
             return _GENESIS
         last = _GENESIS
         try:
-            with self.path.open("r", encoding="utf-8") as fh:
+            with path.open("r", encoding="utf-8") as fh:
                 for line in fh:
                     line = line.strip()
                     if line:

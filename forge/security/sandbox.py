@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 from forge.config import SecurityConfig
 from forge.exceptions import ToolError
 from forge.observability.events import EventBus, EventType
+from forge.security.access import AccessController, Permission, Principal
 from forge.tools.base import Tool
 from forge.types import ToolCall, ToolResult
 
@@ -39,10 +40,14 @@ class ToolSandbox:
         *,
         events: EventBus | None = None,
         policy_set: PolicySet | None = None,
+        access: AccessController | None = None,
+        principal: Principal | None = None,
     ) -> None:
         self._config = config or SecurityConfig()
         self._events = events
         self._policy_set = policy_set
+        self._access = access
+        self._principal = principal
 
     def is_allowed(self, tool: Tool) -> tuple[bool, str | None]:
         """Decide whether ``tool`` may run. Returns ``(allowed, reason_if_not)``."""
@@ -53,6 +58,10 @@ class ToolSandbox:
             return False, "tool is not on the allowlist"
         if tool.dangerous and not (cfg.allow_tools and tool.name in cfg.allow_tools):
             return False, "dangerous tools require explicit allowlisting"
+        if self._access is not None and self._principal is not None:
+            permission = Permission.USE_DANGEROUS_TOOL if tool.dangerous else Permission.USE_TOOL
+            if not self._access.can(self._principal, permission):
+                return False, f"principal lacks permission {permission.value!r}"
         return True, None
 
     async def run(

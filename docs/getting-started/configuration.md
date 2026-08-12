@@ -57,6 +57,11 @@ data_region = "eu-west-1"
 
 ### Budget
 
+Forge reserves conservative input and maximum-output headroom before each model
+call, including concurrent worker calls. Prices are local list-price estimates;
+the provider's reported usage is checked when the call completes and should not
+be treated as an invoice guarantee.
+
 | Variable | Description | Default |
 |---|---|---|
 | `FORGE_MAX_USD_PER_RUN` | Hard USD cap per run | None (unlimited) |

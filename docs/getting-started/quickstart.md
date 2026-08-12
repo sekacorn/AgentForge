@@ -108,8 +108,8 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Forge auto-detects a running Ollama server at `localhost:11434`. No API key, no
-cost, fully air-gapped.
+Set `OLLAMA_BASE_URL=http://localhost:11434` to opt in to a running local Ollama
+server. No API key, no cost, fully air-gapped.
 
 ---
 
