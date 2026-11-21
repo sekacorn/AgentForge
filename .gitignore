@@ -8,6 +8,7 @@ CLAUDE.local.md
 *.claude
 .cursor/
 .aider*
+.codex/
 
 # ---------------------------------------------------------------------------
 # Forge runtime artifacts
