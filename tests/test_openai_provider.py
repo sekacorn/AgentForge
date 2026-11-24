@@ -121,3 +121,88 @@ def test_missing_sdk_raises_helpful_importerror(monkeypatch):
     message = str(exc_info.value)
     assert "openai" in message.lower()
     assert "agentforge-oss[openai]" in message
+
+
+# --- output-token parameter: explicit data, identical default --------------
+
+
+def _old_heuristic(model: str) -> str:
+    """The rule this provider used before it became data. Kept only to compare."""
+    return "max_completion_tokens" if model.startswith("o") else "max_tokens"
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "gpt-4o-mini",
+        "gpt-4o",
+        "gpt-4.1",
+        "o1",
+        "o1-mini",
+        "o3",
+        "o3-mini",
+        "o4-mini",
+        "gpt-3.5-turbo",
+        "chatgpt-4o-latest",
+        "omni-moderation-latest",
+        "openchat",
+        "O3",
+        "",
+    ],
+)
+async def test_default_token_param_is_identical_to_the_old_heuristic(monkeypatch, model):
+    _, client = _install_fake_openai(monkeypatch, response=_response(content="ok"))
+    from forge.models.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="sk-test")
+    await provider.complete([Message.user("hi")], model=model, max_tokens=123)
+
+    sent = client.chat.completions.create.call_args.kwargs
+    expected = _old_heuristic(model)
+    other = "max_tokens" if expected == "max_completion_tokens" else "max_completion_tokens"
+    assert sent[expected] == 123
+    assert other not in sent
+    assert provider.token_param_for(model) == expected
+
+
+@pytest.mark.parametrize("param", ["max_tokens", "max_completion_tokens"])
+@pytest.mark.parametrize("model", ["o3", "gpt-4o", "openchat"])
+async def test_an_explicit_token_param_wins_for_every_model(monkeypatch, param, model):
+    _, client = _install_fake_openai(monkeypatch, response=_response(content="ok"))
+    from forge.models.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="sk-test", token_param=param)
+    await provider.complete([Message.user("hi")], model=model, max_tokens=77)
+
+    sent = client.chat.completions.create.call_args.kwargs
+    assert sent[param] == 77
+    assert len({"max_tokens", "max_completion_tokens"} & set(sent)) == 1
+
+
+async def test_empty_prefixes_never_choose_max_completion_tokens(monkeypatch):
+    # What a non-OpenAI endpoint wants: a model merely named "o..." is not a
+    # reasoning model there.
+    _, client = _install_fake_openai(monkeypatch, response=_response(content="ok"))
+    from forge.models.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(api_key="sk-test", completion_token_model_prefixes=())
+    await provider.complete([Message.user("hi")], model="openchat", max_tokens=50)
+
+    sent = client.chat.completions.create.call_args.kwargs
+    assert sent["max_tokens"] == 50
+    assert "max_completion_tokens" not in sent
+
+
+def test_an_unknown_token_param_is_refused(monkeypatch):
+    _install_fake_openai(monkeypatch)
+    from forge.models.providers.openai import OpenAIProvider
+
+    with pytest.raises(ValueError, match="token_param must be one of"):
+        OpenAIProvider(api_key="sk-test", token_param="max_output_tokens")
+
+
+def test_the_default_prefixes_are_the_documented_data():
+    from forge.models.providers import openai as module
+
+    assert module.DEFAULT_COMPLETION_TOKEN_MODEL_PREFIXES == ("o",)
+    assert module.TOKEN_PARAMS == ("max_tokens", "max_completion_tokens")

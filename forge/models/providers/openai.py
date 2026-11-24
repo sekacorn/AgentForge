@@ -33,6 +33,17 @@ from forge.types import (
     Usage,
 )
 
+#: The two parameter names Chat Completions accepts for the output-token limit.
+TOKEN_PARAMS = ("max_tokens", "max_completion_tokens")
+
+#: Model-name prefixes that take ``max_completion_tokens`` on OpenAI's own API.
+#: OpenAI's o-series reasoning models reject the legacy ``max_tokens``. This is
+#: data about one vendor's model naming, and it is only consulted when no
+#: explicit ``token_param`` was given: behind any other endpoint a model whose
+#: name merely starts with "o" would otherwise be sent a parameter its server
+#: may reject, so callers that know their endpoint should say which to use.
+DEFAULT_COMPLETION_TOKEN_MODEL_PREFIXES: tuple[str, ...] = ("o",)
+
 _FINISH_REASON_MAP = {
     "stop": FinishReason.STOP,
     "tool_calls": FinishReason.TOOL_CALLS,
@@ -47,7 +58,26 @@ class OpenAIProvider(ModelProvider):
 
     name = "openai"
 
-    def __init__(self, api_key: str | None = None, *, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        *,
+        base_url: str | None = None,
+        token_param: str | None = None,
+        completion_token_model_prefixes: tuple[str, ...] = DEFAULT_COMPLETION_TOKEN_MODEL_PREFIXES,
+    ) -> None:
+        """Create the provider.
+
+        ``token_param`` names the output-limit parameter to send for every
+        model, ``"max_tokens"`` or ``"max_completion_tokens"``. Left unset, the
+        choice is made per model from ``completion_token_model_prefixes``, whose
+        default reproduces the behaviour this provider has always had against
+        OpenAI's own API.
+        """
+        if token_param is not None and token_param not in TOKEN_PARAMS:
+            raise ValueError(f"token_param must be one of {TOKEN_PARAMS}, not {token_param!r}.")
+        self._token_param = token_param
+        self._completion_token_model_prefixes = tuple(completion_token_model_prefixes)
         try:
             import openai
         except ImportError as exc:  # pragma: no cover - exercised only without the extra
@@ -83,10 +113,7 @@ class OpenAIProvider(ModelProvider):
             "model": model,
             "messages": self._to_api_messages(messages, system),
         }
-        # The o-series reasoning models use ``max_completion_tokens`` and reject
-        # the legacy ``max_tokens`` parameter.
-        token_param = "max_completion_tokens" if model.startswith("o") else "max_tokens"
-        request[token_param] = max_tokens
+        request[self.token_param_for(model)] = max_tokens
         if tools:
             request["tools"] = [self._to_api_tool(t) for t in tools]
         for key in ("tool_choice", "temperature", "response_format"):
@@ -107,6 +134,20 @@ class OpenAIProvider(ModelProvider):
             ) from exc
 
         return self._from_api_response(response, model)
+
+    def token_param_for(self, model: str) -> str:
+        """The output-limit parameter this provider sends for ``model``.
+
+        An explicit ``token_param`` wins for every model. Otherwise the choice
+        comes from the configured prefixes, which is data rather than a rule
+        baked into the request path.
+        """
+        if self._token_param is not None:
+            return self._token_param
+        prefixes = self._completion_token_model_prefixes
+        if prefixes and model.startswith(prefixes):
+            return "max_completion_tokens"
+        return "max_tokens"
 
     async def aclose(self) -> None:
         await self._client.close()
