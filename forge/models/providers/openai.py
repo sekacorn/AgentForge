@@ -74,6 +74,7 @@ class OpenAIProvider(ModelProvider):
         base_url: str | None = None,
         token_param: str | None = None,
         completion_token_model_prefixes: tuple[str, ...] = DEFAULT_COMPLETION_TOKEN_MODEL_PREFIXES,
+        http_client: Any | None = None,
     ) -> None:
         """Create the provider.
 
@@ -101,6 +102,8 @@ class OpenAIProvider(ModelProvider):
             client_kwargs["api_key"] = api_key
         if base_url:
             client_kwargs["base_url"] = base_url
+        if http_client is not None:
+            client_kwargs["http_client"] = http_client
         try:
             self._client = openai.AsyncOpenAI(**client_kwargs)
         except Exception as exc:  # e.g. missing key when none in env
@@ -118,16 +121,9 @@ class OpenAIProvider(ModelProvider):
         max_tokens: int = 4096,
         **options: object,
     ) -> ModelResponse:
-        request: dict[str, Any] = {
-            "model": model,
-            "messages": self._to_api_messages(messages, system),
-        }
-        request[self.token_param_for(model)] = max_tokens
-        if tools:
-            request["tools"] = [self._to_api_tool(t) for t in tools]
-        for key in ("tool_choice", "temperature", "response_format"):
-            if key in options and options[key] is not None:
-                request[key] = options[key]
+        request = self._build_request(
+            messages, model=model, tools=tools, system=system, max_tokens=max_tokens, **options
+        )
 
         # The upstream message is never carried into the error, and the cause
         # chain is cut with ``from None``. A server can reflect request headers
@@ -149,6 +145,29 @@ class OpenAIProvider(ModelProvider):
             ) from None
 
         return self._from_api_response(response, model)
+
+    def _build_request(
+        self,
+        messages: list[Message],
+        *,
+        model: str,
+        tools: list[ToolSchema] | None = None,
+        system: str | None = None,
+        max_tokens: int = 4096,
+        **options: object,
+    ) -> dict[str, Any]:
+        """The Chat Completions request body for one call."""
+        request: dict[str, Any] = {
+            "model": model,
+            "messages": self._to_api_messages(messages, system),
+        }
+        request[self.token_param_for(model)] = max_tokens
+        if tools:
+            request["tools"] = [self._to_api_tool(t) for t in tools]
+        for key in ("tool_choice", "temperature", "response_format"):
+            if key in options and options[key] is not None:
+                request[key] = options[key]
+        return request
 
     def token_param_for(self, model: str) -> str:
         """The output-limit parameter this provider sends for ``model``.

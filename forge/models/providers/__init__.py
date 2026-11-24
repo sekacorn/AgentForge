@@ -12,11 +12,13 @@ from forge.models.providers.bedrock import BedrockProvider
 from forge.models.providers.echo import EchoProvider
 from forge.models.providers.ollama import OllamaProvider
 from forge.models.providers.openai import OpenAIProvider
+from forge.models.providers.openai_compatible import OpenAICompatibleProvider
 
 __all__ = [
     "AnthropicProvider",
     "BedrockProvider",
     "EchoProvider",
     "OllamaProvider",
+    "OpenAICompatibleProvider",
     "OpenAIProvider",
 ]

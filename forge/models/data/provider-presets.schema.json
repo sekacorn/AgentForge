@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sekacorn/agentforge-oss/schemas/provider-presets.schema.json",
+  "title": "provider-presets.v1",
+  "description": "Named presets for OpenAI-compatible endpoints. A preset records where a vendor documents such an endpoint; it never asserts that the vendor's API was contacted or works.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "presets"],
+  "properties": {
+    "schema_version": { "const": "provider-presets.v1" },
+    "notice": { "type": "string", "maxLength": 2048 },
+    "presets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+      "additionalProperties": { "$ref": "#/$defs/preset" }
+    }
+  },
+  "$defs": {
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_url",
+        "docs_url",
+        "jurisdiction",
+        "hosting",
+        "api_key_env",
+        "token_param",
+        "compatibility",
+        "review",
+        "notes"
+      ],
+      "properties": {
+        "base_url": { "type": "string", "pattern": "^https?://", "maxLength": 2048 },
+        "docs_url": { "type": "string", "pattern": "^https://", "maxLength": 2048 },
+        "jurisdiction": {
+          "description": "The vendor's stated corporate jurisdiction as an ISO 3166-1 alpha-2 code, or not_applicable for a local endpoint. Attested, never checked.",
+          "type": "string",
+          "pattern": "^([A-Z]{2}|not_applicable)$"
+        },
+        "hosting": { "enum": ["local", "hosted"] },
+        "api_key_env": {
+          "description": "Name of the environment variable that holds the key. Never the key.",
+          "type": ["string", "null"],
+          "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
+        },
+        "token_param": { "enum": ["max_tokens", "max_completion_tokens"] },
+        "compatibility": {
+          "description": "documented: the vendor documents an OpenAI-compatible endpoint. partial: known divergence, described in notes.",
+          "enum": ["documented", "partial"]
+        },
+        "review": {
+          "description": "unreviewed: base_url not yet confirmed against docs_url in this repository's history. reviewed: confirmed against the documentation only, never against the live API.",
+          "enum": ["unreviewed", "reviewed"]
+        },
+        "notes": { "type": "string", "maxLength": 1024 }
+      }
+    }
+  }
+}

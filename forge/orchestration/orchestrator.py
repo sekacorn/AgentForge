@@ -36,6 +36,7 @@ from forge.models.providers.bedrock import BedrockProvider
 from forge.models.providers.echo import EchoProvider
 from forge.models.providers.ollama import OllamaProvider
 from forge.models.providers.openai import OpenAIProvider
+from forge.models.providers.openai_compatible import OpenAICompatibleProvider
 from forge.models.registry import ModelRegistry
 from forge.models.router import ModelRouter
 from forge.observability.events import Event, EventBus, EventType
@@ -296,6 +297,16 @@ class Orchestrator:
                 providers["openai"] = OpenAIProvider(api_key=openai_key)
             except (ForgeError, ImportError) as exc:
                 self._log.warning("OpenAI provider unavailable: %s", exc)
+        if self.config.openai_compatible_base_url or self.config.openai_compatible_preset:
+            try:
+                providers["openai_compatible"] = OpenAICompatibleProvider(
+                    base_url=self.config.openai_compatible_base_url,
+                    preset=self.config.openai_compatible_preset,
+                    api_key_env=self.config.openai_compatible_api_key_env,
+                )
+            except (ForgeError, ImportError) as exc:
+                # ForgeError messages from this provider never contain the key.
+                self._log.warning("OpenAI-compatible provider unavailable: %s", exc)
         if self._aws_credentials_available():
             try:
                 providers["bedrock"] = BedrockProvider(

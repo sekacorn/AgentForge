@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 
 from forge.models.base import ModelProvider
+from forge.models.presets import describe_provider
 from forge.models.router import Complexity
 from forge.observability.events import EventType
 from forge.tools.registry import ToolRegistry
@@ -110,12 +111,16 @@ class BaseAgent(abc.ABC):
             max_output_tokens=max_tokens,
         )
 
+        # Always populated: provider, hosting and jurisdiction accompany every
+        # model call, with the literal "unknown" where nothing is known.
+        block = describe_provider(provider)
         ctx.events.emit(
             EventType.MODEL_CALL_STARTED,
             run_id=ctx.run_id,
             agent=self.name,
             model=decision.model,
             provider=decision.provider,
+            **block.to_event(),
         )
         try:
             if ctx.stream:

@@ -53,6 +53,67 @@ Run `forge models` for live pricing from the registry.
 
 ---
 
+## OpenAI-compatible endpoints
+
+Many vendors and local servers expose an endpoint that speaks the Chat
+Completions API. One generic provider, `openai_compatible`, reaches all of
+them. It needs the `openai` extra.
+
+```bash
+# A local server, by preset:
+export FORGE_OPENAI_COMPATIBLE_PRESET=local_vllm
+
+# Or any endpoint, by URL, with the key in a variable you name:
+export FORGE_OPENAI_COMPATIBLE_BASE_URL=https://llm.example.com/v1
+export FORGE_OPENAI_COMPATIBLE_API_KEY_ENV=MY_ENDPOINT_KEY
+```
+
+`FORGE_OPENAI_COMPATIBLE_API_KEY_ENV` is the **name** of the variable that
+holds the key. The key itself is never written to configuration, and it never
+appears in an error, a log line or an event.
+
+Presets live in a versioned data file, `provider-presets.v1`. Each one records
+a base URL, a link to the vendor's documentation, the vendor's stated
+jurisdiction, and whether the endpoint is local or hosted. **A preset is data,
+not a claim.** This project has not contacted any vendor's API; every preset is
+marked `unreviewed`, and the provider is tested against a fake in-process
+server only. Two presets are marked `partial` because their vendors document
+known divergences.
+
+The router only selects models that are registered. Register the models your
+endpoint serves, with their real prices, under the provider name
+`openai_compatible`:
+
+```python
+from forge import ModelInfo, ModelRegistry, ModelTier
+
+registry = ModelRegistry()
+registry.register(
+    ModelInfo(
+        name="my-model",
+        provider="openai_compatible",
+        tier=ModelTier.MEDIUM,
+        context_window=32_000,
+        max_output_tokens=4_096,
+        input_cost_per_mtok=0.0,  # your endpoint's real price
+        output_cost_per_mtok=0.0,
+    )
+)
+```
+
+No prices are invented for you: a model with no declared price would be
+reported as free.
+
+### Hosting and jurisdiction on every call
+
+Every `model.call.started` event carries `provider`, `hosting` and
+`jurisdiction`, for every provider. With a preset the jurisdiction is the
+vendor's stated one, which is attested and says nothing about where a packet
+travels. With a custom `base_url` the hosting is derived from the endpoint
+(loopback and private ranges are local; names are never resolved) and the
+jurisdiction is `"unknown"`. A provider this package knows nothing about is
+`"unknown"` on both counts, never assumed local.
+
 ## OpenAI (GPT)
 
 GPT-4o-mini, GPT-4o, GPT-4.1, and o3.
