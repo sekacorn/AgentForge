@@ -8,6 +8,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-24
+
+Security release, with the OpenAI-compatible provider work. **Upgrade if you
+use any network provider through a proxy, gateway or endpoint you do not
+control**: see Security. Imports, public API and CLI commands are unchanged.
+Two behaviours changed on purpose and are called out first under Changed:
+Bedrock is no longer wired automatically from an instance profile, and
+provider error messages no longer include upstream text.
+
 ### Added
 - **`OpenAICompatibleProvider`** (`forge.models.providers.openai_compatible`,
   registry key `openai_compatible`): one generic provider for any endpoint that
@@ -125,19 +134,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   or the existence of a shared credentials file.
 
 ### Changed
+- **Bedrock is no longer wired automatically from an instance profile.
+  Migration: set `FORGE_BEDROCK_ENABLED=1` (or `bedrock_enabled = true`).**
+  Before this release, building an `Orchestrator` asked boto3 to resolve AWS
+  credentials, which ends at a network call to the instance-metadata service.
+  That call is gone (see Fixed), so a host whose *only* AWS credentials come
+  from an instance profile, such as an EC2 instance, ECS task or EKS pod role,
+  no longer gets the Bedrock provider unless you ask for it. Hosts with
+  credentials in environment variables or `~/.aws` files are detected as
+  before and need no change. With the setting on, boto3 contacts the
+  instance-metadata service when the provider is built, which is the lookup
+  the setting asks for.
 - Error messages from `AnthropicProvider`, `BedrockProvider` and
   `OllamaProvider` no longer include the upstream explanation (see Security).
   Code that matched on that text should read `error.context` instead:
   `status_code`, `error_type`, and `code` for Bedrock. Ollama's 400 and 404
   errors carry a fixed hint in place of the server's wording, and the
   `base_url` in its error context is now the scheme, host and port only.
-- A host whose only AWS credentials come from an **instance profile** is no
-  longer detected automatically, because detecting it is the network call that
-  was removed. Set `bedrock_enabled = true` (`FORGE_BEDROCK_ENABLED=1`) to
-  offer the Bedrock provider there.
-  With that set, boto3 contacts the
-  instance-metadata service when the provider is built, which is the lookup
-  the setting asks for.
 - `OpenAIProvider` no longer decides between `max_tokens` and
   `max_completion_tokens` with a rule buried in the request path. The choice is
   now explicit data: a new `token_param` argument names the parameter to send

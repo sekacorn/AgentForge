@@ -8,6 +8,160 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-24
+
+Security release, with the OpenAI-compatible provider work. **Upgrade if you
+use any network provider through a proxy, gateway or endpoint you do not
+control**: see Security. Imports, public API and CLI commands are unchanged.
+Two behaviours changed on purpose and are called out first under Changed:
+Bedrock is no longer wired automatically from an instance profile, and
+provider error messages no longer include upstream text.
+
+### Added
+- **`OpenAICompatibleProvider`** (`forge.models.providers.openai_compatible`,
+  registry key `openai_compatible`): one generic provider for any endpoint that
+  speaks the Chat Completions API, configured by a named preset, a `base_url`,
+  or both. Vendor names appear only in the preset data, never in a module,
+  class or CLI name.
+- **Provider presets** as a versioned data file, `provider-presets.v1`, with a
+  JSON Schema. Each preset records a `base_url`, a documentation link, the
+  vendor's stated jurisdiction, and whether the endpoint is local or hosted.
+  A preset is data, not a claim: no vendor API was contacted by this project,
+  and the tests run against a fake in-process server only.
+- Configuration fields `openai_compatible_base_url`,
+  `openai_compatible_preset` and `openai_compatible_api_key_env` (environment:
+  `FORGE_OPENAI_COMPATIBLE_BASE_URL`, `FORGE_OPENAI_COMPATIBLE_PRESET`,
+  `FORGE_OPENAI_COMPATIBLE_API_KEY_ENV`). The last names the environment
+  variable that holds the key; the key itself is never stored in configuration.
+  With none of these set, nothing changes: the `openai` provider is built
+  exactly as before.
+- Every `model.call.started` event now carries `hosting`, `jurisdiction` and
+  `provider_preset` beside `provider`, for every provider. Where nothing is
+  known the value is the literal `"unknown"`, never an omission. Hosting for a
+  custom `base_url` is derived from the endpoint, and its jurisdiction is
+  `"unknown"`. `RunContext.policy_request_block(model)` returns the same facts
+  in the `model` / `provider` shape a policy engine matches on.
+
+- **User-supplied preset files.** `provider_presets_path`
+  (`FORGE_PROVIDER_PRESETS_PATH`) names a `provider-presets.v1` file of your
+  own, loaded alongside the built-in presets and validated the same way. A
+  jurisdiction declared there is reported as attested, like the shipped ones.
+  An id that collides with a built-in preset is an error, never a silent
+  override.
+- `model.call.started` events also carry `jurisdiction_verification`
+  (`attested`, `unknown` or `not_applicable`) and `provider_preset_source`
+  (`built_in` or `user`).
+- `docs/provider-coverage.md` lists each preset's status. Ten of the eleven
+  presets had their `base_url` read on the vendor's documentation on
+  2026-11-24 and are marked `reviewed` with that date; one is left
+  `unreviewed`. A review reads documentation only. No vendor API was
+  contacted. The review corrected one preset's host and three documentation
+  links, and marked one more preset `partial`.
+
+### Security
+- **`OpenAIProvider` and `OpenAICompatibleProvider` refuse a `base_url` that
+  contains credentials. Affects 0.5.4 and earlier.** A URL such as
+  `https://user:password@host/v1` was accepted and used, and the HTTP client
+  logs the request URL at INFO on every call, so the password reached the
+  logs. Such a URL now raises `ConfigurationError` at construction, for
+  `base_url`, for a preset's URL and for the SDK's own `OPENAI_BASE_URL`. The
+  error names the scheme and host only. Remove the credentials from the URL
+  and supply the key through `api_key` or its environment variable. If you ran
+  0.5.4 or earlier with credentials in a `base_url` and INFO logging on, treat
+  them as exposed and rotate them.
+- **`OpenAIProvider` error messages could contain the API key. Affects 0.5.4
+  and earlier.** A failed request raised `ProviderResponseError` with the
+  upstream error text interpolated into its message, and all three provider
+  errors kept the SDK exception as their cause. A server that reflects request
+  headers in its error body, which a misconfigured proxy or a third-party
+  endpoint reached through `base_url` can do, therefore put the
+  `Authorization` value into the exception message, into any traceback that
+  rendered the cause chain, and into whatever logged or audited the error.
+
+  Errors from this provider no longer carry upstream text. They carry the
+  model, the exception type and the HTTP status code, and the cause chain is
+  cut. If you logged or stored `ProviderResponseError` messages from 0.5.4 or
+  earlier while pointing the provider at an endpoint you do not control,
+  treat the key used there as exposed and rotate it.
+- **`AnthropicProvider`, `BedrockProvider` and `OllamaProvider` errors could
+  repeat upstream text, including credentials. Affects 0.5.4 and earlier.**
+  The same fault as the `OpenAIProvider` one above, in the other three
+  providers that call out:
+  - `AnthropicProvider` interpolated the upstream error into
+    `ProviderResponseError`, and all three of its errors kept the SDK
+    exception as their cause. A server or proxy that reflects request headers
+    could put the `x-api-key` value into the message or the traceback.
+  - `BedrockProvider` interpolated the botocore `ClientError`, which carries
+    the service's message, and kept it as the cause on every error path
+    including `stream()`.
+  - `OllamaProvider` repeated the response body of any non-200 answer and the
+    text of any transport error, which includes the request URL, and reported
+    its configured `base_url` verbatim in the error context. Ollama takes no
+    API key, but a `base_url` with credentials in it (`http://user:pass@host`)
+    exposed them this way.
+
+  Errors from all five network providers now carry only values this library
+  chose or measured: the model, the exception type, the HTTP status code, and
+  for Bedrock the AWS error code when it has the shape of one. The cause chain
+  is cut. One parametrized test runs every provider against an in-process
+  server that reflects the request's credentials, for 401, 429 and 500. If you
+  logged or stored provider error messages from 0.5.4 or earlier while using a
+  proxy, gateway or endpoint you do not control, treat the credential used
+  there as exposed and rotate it.
+- **`OllamaProvider` no longer leaves URL credentials in the request URL.**
+  Credentials in `base_url` are sent as the same Basic auth header as before
+  but are removed from the URL, because the HTTP client logs every request URL
+  at INFO. Affects 0.5.4 and earlier.
+- Errors raised by `OpenAICompatibleProvider` never carry the upstream message
+  text, only the endpoint origin and a status code, and the cause chain is cut,
+  so an API key reflected by a server cannot reach an exception, a log line or
+  an event.
+- **The `http_get` tool no longer repeats exception text in its result.
+  Affects 0.5.4 and earlier.** A failed request returned the HTTP client's
+  error text to the model, and that text can repeat the requested URL,
+  including a token in its query string or userinfo. The result now names the
+  exception type only, and a URL that cannot be parsed returns an error
+  instead of raising.
+
+### Fixed
+- **Constructing an `Orchestrator` no longer attempts a network call.** With
+  boto3 installed, building the default providers asked boto3 to resolve AWS
+  credentials, which walks the whole provider chain and ends at the
+  instance-metadata address. Merely creating an orchestrator on a machine with
+  no AWS configuration therefore tried to open a connection. Bedrock
+  availability is now decided from local signals only: credential environment
+  variables, a named profile, web-identity or container-credential variables,
+  or the existence of a shared credentials file.
+
+### Changed
+- **Bedrock is no longer wired automatically from an instance profile.
+  Migration: set `FORGE_BEDROCK_ENABLED=1` (or `bedrock_enabled = true`).**
+  Before this release, building an `Orchestrator` asked boto3 to resolve AWS
+  credentials, which ends at a network call to the instance-metadata service.
+  That call is gone (see Fixed), so a host whose *only* AWS credentials come
+  from an instance profile, such as an EC2 instance, ECS task or EKS pod role,
+  no longer gets the Bedrock provider unless you ask for it. Hosts with
+  credentials in environment variables or `~/.aws` files are detected as
+  before and need no change. With the setting on, boto3 contacts the
+  instance-metadata service when the provider is built, which is the lookup
+  the setting asks for.
+- Error messages from `AnthropicProvider`, `BedrockProvider` and
+  `OllamaProvider` no longer include the upstream explanation (see Security).
+  Code that matched on that text should read `error.context` instead:
+  `status_code`, `error_type`, and `code` for Bedrock. Ollama's 400 and 404
+  errors carry a fixed hint in place of the server's wording, and the
+  `base_url` in its error context is now the scheme, host and port only.
+- `OpenAIProvider` no longer decides between `max_tokens` and
+  `max_completion_tokens` with a rule buried in the request path. The choice is
+  now explicit data: a new `token_param` argument names the parameter to send
+  for every model, and `completion_token_model_prefixes` (default `("o",)`)
+  drives the per-model choice when `token_param` is unset. **Default behaviour
+  against OpenAI's own API is unchanged**, and a test compares every default
+  outcome with the previous rule. The reason for the change is other
+  endpoints: reached through `base_url`, a model whose name merely starts with
+  "o" was sent `max_completion_tokens`, which its server may reject. Callers
+  that know their endpoint can now say which parameter it takes.
+
 ## [0.5.4] - 2026-08-12
 
 Beta-hardening release. No new product features; imports, public API and CLI
