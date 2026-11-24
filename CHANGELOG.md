@@ -24,7 +24,24 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   earlier while pointing the provider at an endpoint you do not control,
   treat the key used there as exposed and rotate it.
 
+### Fixed
+- **Constructing an `Orchestrator` no longer attempts a network call.** With
+  boto3 installed, building the default providers asked boto3 to resolve AWS
+  credentials, which walks the whole provider chain and ends at the
+  instance-metadata address. Merely creating an orchestrator on a machine with
+  no AWS configuration therefore tried to open a connection. Bedrock
+  availability is now decided from local signals only: credential environment
+  variables, a named profile, web-identity or container-credential variables,
+  or the existence of a shared credentials file.
+
 ### Changed
+- A host whose only AWS credentials come from an **instance profile** is no
+  longer detected automatically, because detecting it is the network call that
+  was removed. Set `bedrock_enabled = true` (`FORGE_BEDROCK_ENABLED=1`) to
+  offer the Bedrock provider there.
+  With that set, boto3 contacts the
+  instance-metadata service when the provider is built, which is the lookup
+  the setting asks for.
 - `OpenAIProvider` no longer decides between `max_tokens` and
   `max_completion_tokens` with a rule buried in the request path. The choice is
   now explicit data: a new `token_param` argument names the parameter to send

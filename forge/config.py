@@ -155,6 +155,10 @@ class ForgeConfig(BaseModel):
     bedrock_region: str | None = None
     #: AWS named profile for the Bedrock provider (from ``AWS_PROFILE``).
     bedrock_profile: str | None = None
+    #: Offer the Bedrock provider even when no credentials are visible locally
+    #: (from ``FORGE_BEDROCK_ENABLED``). For hosts whose credentials come only from
+    #: an instance profile, which is deliberately never probed.
+    bedrock_enabled: bool = False
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -213,6 +217,7 @@ class ForgeConfig(BaseModel):
         )
         if (aws_profile := os.environ.get("AWS_PROFILE")) is not None:
             self.bedrock_profile = aws_profile
+        self.bedrock_enabled = _env_bool("FORGE_BEDROCK_ENABLED", self.bedrock_enabled)
 
         if (level := os.environ.get("FORGE_LOG_LEVEL")) is not None:
             self.observability.log_level = level
