@@ -121,8 +121,8 @@ def test_the_data_file_matches_its_json_schema() -> None:
 
 
 def test_the_data_file_validates_with_a_json_schema_validator() -> None:
-    # jsonschema is not a dependency of this package; the check above covers
-    # the same contract by hand when it is absent.
+    # jsonschema is a development dependency only, never a runtime one. The
+    # check above covers the same contract by hand if it is absent.
     jsonschema = pytest.importorskip("jsonschema")
     jsonschema.validate(_raw_document(), _schema())
 
