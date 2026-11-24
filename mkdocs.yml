@@ -70,6 +70,7 @@ nav:
     - API reference: reference/api.md
     - Configuration reference: reference/configuration.md
     - Changelog: reference/changelog.md
+    - Known issues: known-issues.md
   - Contributing: contributing.md
 
 extra:
