@@ -8,6 +8,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- `OpenAIProvider` no longer decides between `max_tokens` and
+  `max_completion_tokens` with a rule buried in the request path. The choice is
+  now explicit data: a new `token_param` argument names the parameter to send
+  for every model, and `completion_token_model_prefixes` (default `("o",)`)
+  drives the per-model choice when `token_param` is unset. **Default behaviour
+  against OpenAI's own API is unchanged**, and a test compares every default
+  outcome with the previous rule. The reason for the change is other
+  endpoints: reached through `base_url`, a model whose name merely starts with
+  "o" was sent `max_completion_tokens`, which its server may reject. Callers
+  that know their endpoint can now say which parameter it takes.
+
 ## [0.5.4] - 2026-08-12
 
 Beta-hardening release. No new product features; imports, public API and CLI
