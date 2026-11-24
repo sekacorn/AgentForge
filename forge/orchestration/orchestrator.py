@@ -15,8 +15,10 @@ Everything is async-first; ``run_sync`` is provided for scripts and the CLI.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import os
 from collections.abc import Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
@@ -321,22 +323,41 @@ class Orchestrator:
         return bool(os.environ.get("OLLAMA_BASE_URL"))
 
     def _aws_credentials_available(self) -> bool:
-        """Whether AWS credentials resolve for the Bedrock provider.
+        """Whether AWS credentials are *configured* for the Bedrock provider.
 
-        Configuring AWS credentials is a deliberate signal, so Bedrock outranks the
-        local Ollama probe. The check is lazy and never makes boto3 a hard
-        dependency: if boto3 is not installed it simply returns False.
+        Decided from local signals only: environment variables, a named
+        profile, and whether a shared credentials file exists. It never asks
+        boto3 to resolve credentials, because that walks the full provider
+        chain and ends at the instance-metadata address, which is a network
+        call made merely by constructing an orchestrator.
+
+        The cost is that a host whose only credentials come from an instance
+        profile is not detected. Such a host opts in explicitly with
+        ``bedrock_enabled`` (``FORGE_BEDROCK_ENABLED=1``), which is a
+        deliberate statement rather than a probe.
+
+        boto3 stays an optional dependency: without it this returns False.
         """
-        try:
-            import boto3
-        except ImportError:
+        if importlib.util.find_spec("boto3") is None:
             return False
+        if self.config.bedrock_enabled:
+            return True
+        if self.config.bedrock_profile:
+            return True
+        env = os.environ
+        if env.get("AWS_ACCESS_KEY_ID") and env.get("AWS_SECRET_ACCESS_KEY"):
+            return True
+        if env.get("AWS_WEB_IDENTITY_TOKEN_FILE") and env.get("AWS_ROLE_ARN"):
+            return True
+        if env.get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") or env.get(
+            "AWS_CONTAINER_CREDENTIALS_FULL_URI"
+        ):
+            return True
+        shared = env.get("AWS_SHARED_CREDENTIALS_FILE")
         try:
-            session = boto3.Session(
-                region_name=self.config.bedrock_region, profile_name=self.config.bedrock_profile
-            )
-            return session.get_credentials() is not None
-        except Exception:  # noqa: BLE001 - any failure just means "not available"
+            path = Path(shared) if shared else Path.home() / ".aws" / "credentials"
+            return path.is_file()
+        except (OSError, RuntimeError):
             return False
 
     def _apply_default_provider(self) -> None:
