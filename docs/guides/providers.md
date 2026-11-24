@@ -107,6 +107,10 @@ Its jurisdiction is `"unknown"` and its hosting is derived from the URL. If
 you govern model use by jurisdiction, a policy that denies `unknown` will stop
 this endpoint until you describe it with a preset of your own.
 
+A `base_url` must not contain credentials. `https://user:password@host/v1` is
+refused with a configuration error, because HTTP clients log the request URL.
+Supply the key through the environment variable instead.
+
 ### Your own preset file
 
 Describe your endpoints in a file with the same schema as the shipped presets
