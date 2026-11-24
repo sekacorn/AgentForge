@@ -107,6 +107,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   text, only the endpoint origin and a status code, and the cause chain is cut,
   so an API key reflected by a server cannot reach an exception, a log line or
   an event.
+- **The `http_get` tool no longer repeats exception text in its result.
+  Affects 0.5.4 and earlier.** A failed request returned the HTTP client's
+  error text to the model, and that text can repeat the requested URL,
+  including a token in its query string or userinfo. The result now names the
+  exception type only, and a URL that cannot be parsed returns an error
+  instead of raising.
 
 ### Fixed
 - **Constructing an `Orchestrator` no longer attempts a network call.** With

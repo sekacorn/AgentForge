@@ -9,6 +9,7 @@ Hermetic: the few tests that need a server response drive ``http_get`` through a
 from __future__ import annotations
 
 import httpx
+import pytest
 
 from forge.tools.builtin import http as http_mod
 from forge.tools.builtin.http import _MAX_BYTES, http_get
@@ -66,3 +67,30 @@ async def test_caps_response_size(monkeypatch) -> None:
     assert "[truncated]" in result
     # Output is bounded near the cap, not the full oversized body.
     assert len(result) < _MAX_BYTES + 100
+
+
+_URL_TOKEN = "url-token-51c8-do-not-log"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError, httpx.InvalidURL],
+)
+async def test_a_failed_request_does_not_repeat_the_url_or_the_error_text(
+    monkeypatch: pytest.MonkeyPatch, failure: type[Exception]
+) -> None:
+    # A URL can carry a token; the tool result goes back to the model.
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise failure(f"could not fetch {request.url}")
+
+    _use_mock(monkeypatch, handler)
+    result = await _fetch(f"http://example.com/data?access_token={_URL_TOKEN}")
+
+    assert result == f"Error: request failed ({failure.__name__})"
+    assert _URL_TOKEN not in result
+
+
+async def test_an_unparseable_url_is_refused_without_raising() -> None:
+    result = await _fetch(f"http://[not-an-address/{_URL_TOKEN}")
+
+    assert result == "Error: the URL could not be parsed."
