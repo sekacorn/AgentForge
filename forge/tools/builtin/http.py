@@ -43,7 +43,11 @@ async def http_get(url: str, timeout: float = 10.0) -> str:  # noqa: ASYNC109
     """
     if not url.lower().startswith(("http://", "https://")):
         return "Error: only http(s) URLs are supported."
-    if (urlparse(url).hostname or "").lower() in _BLOCKED_HOSTS:
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return "Error: the URL could not be parsed."
+    if host in _BLOCKED_HOSTS:
         return "Error: refusing to fetch a loopback or link-local address."
 
     try:
@@ -62,8 +66,11 @@ async def http_get(url: str, timeout: float = 10.0) -> str:  # noqa: ASYNC109
                 total += len(chunk)
                 if total > _MAX_BYTES:
                     break
-    except httpx.HTTPError as exc:
-        return f"Error: request failed ({exc})"
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
+        # Only the exception's type. Its text can repeat the URL, and a URL can
+        # carry a token in its query string or userinfo; this result goes back
+        # to the model and into the transcript.
+        return f"Error: request failed ({type(exc).__name__})"
 
     body = b"".join(chunks)[:_MAX_BYTES].decode("utf-8", errors="replace")
     suffix = "... [truncated]" if total > _MAX_BYTES else ""
