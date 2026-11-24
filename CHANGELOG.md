@@ -8,6 +8,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **`OpenAIProvider` error messages could contain the API key. Affects 0.5.4
+  and earlier.** A failed request raised `ProviderResponseError` with the
+  upstream error text interpolated into its message, and all three provider
+  errors kept the SDK exception as their cause. A server that reflects request
+  headers in its error body, which a misconfigured proxy or a third-party
+  endpoint reached through `base_url` can do, therefore put the
+  `Authorization` value into the exception message, into any traceback that
+  rendered the cause chain, and into whatever logged or audited the error.
+
+  Errors from this provider no longer carry upstream text. They carry the
+  model, the exception type and the HTTP status code, and the cause chain is
+  cut. If you logged or stored `ProviderResponseError` messages from 0.5.4 or
+  earlier while pointing the provider at an endpoint you do not control,
+  treat the key used there as exposed and rotate it.
+
 ### Changed
 - `OpenAIProvider` no longer decides between `max_tokens` and
   `max_completion_tokens` with a rule buried in the request path. The choice is

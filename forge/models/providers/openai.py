@@ -53,6 +53,15 @@ _FINISH_REASON_MAP = {
 }
 
 
+def _error_context(model: str, exc: BaseException) -> dict[str, Any]:
+    """Describe an upstream failure without repeating anything the server said."""
+    context: dict[str, Any] = {"model": model, "error_type": type(exc).__name__}
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and not isinstance(status, bool):
+        context["status_code"] = status
+    return context
+
+
 class OpenAIProvider(ModelProvider):
     """Calls OpenAI GPT models through the official OpenAI SDK."""
 
@@ -120,18 +129,24 @@ class OpenAIProvider(ModelProvider):
             if key in options and options[key] is not None:
                 request[key] = options[key]
 
+        # The upstream message is never carried into the error, and the cause
+        # chain is cut with ``from None``. A server can reflect request headers
+        # in its error body, so the upstream text may contain the API key; the
+        # status code and exception type say what happened without it.
         try:
             response = await self._client.chat.completions.create(**request)
         except self._openai.AuthenticationError as exc:
             raise ProviderAuthError(
-                "OpenAI authentication failed", context={"model": model}
-            ) from exc
+                "OpenAI authentication failed", context=_error_context(model, exc)
+            ) from None
         except self._openai.RateLimitError as exc:
-            raise ProviderRateLimitError("OpenAI rate limit hit", context={"model": model}) from exc
+            raise ProviderRateLimitError(
+                "OpenAI rate limit hit", context=_error_context(model, exc)
+            ) from None
         except self._openai.APIError as exc:
             raise ProviderResponseError(
-                f"OpenAI API error: {exc}", context={"model": model}
-            ) from exc
+                "OpenAI API error", context=_error_context(model, exc)
+            ) from None
 
         return self._from_api_response(response, model)
 
