@@ -67,3 +67,26 @@ def endpoint_origin(base_url: str) -> str:
     if ":" in host:
         host = f"[{host}]"
     return f"{parts.scheme}://{host}" + (f":{port}" if port else "")
+
+
+#: Raised verbatim, so the fix is in the message and the URL is not.
+URL_CREDENTIALS_MESSAGE = (
+    "base_url must not contain credentials (user:password@host). "
+    "Remove them from the URL and supply the key through api_key or its "
+    "environment variable."
+)
+
+
+def url_has_credentials(base_url: str) -> bool:
+    """Whether ``base_url`` carries a username or password.
+
+    Such a URL is refused rather than used: HTTP clients log the request URL,
+    so credentials placed there reach the logs on every call. A URL that cannot
+    be parsed is judged by whether its authority contains ``@``.
+    """
+    try:
+        parts = urlsplit(base_url)
+        return parts.username is not None or parts.password is not None
+    except ValueError:
+        authority = base_url.split("//", 1)[-1].split("/", 1)[0]
+        return "@" in authority
