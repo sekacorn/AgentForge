@@ -21,11 +21,13 @@ import json
 import os
 from collections.abc import AsyncIterator
 from typing import Any
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 import httpx
 
 from forge.exceptions import ProviderError, ProviderResponseError
 from forge.models.base import ModelProvider, split_system
+from forge.models.endpoints import endpoint_origin
 from forge.types import (
     FinishReason,
     Message,
@@ -41,6 +43,26 @@ DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 #: Raised verbatim when the server cannot be reached, so the operator knows the fix.
 _NOT_RUNNING_HINT = "Ollama is not running. Start it with: ollama serve"
 
+#: Fixed advice per status code. The server's own explanation is not repeated.
+_STATUS_HINTS = {
+    400: ". The request was rejected; the model may not support tool calling.",
+    404: ". The model was not found; pull it with: ollama pull <model>",
+}
+
+
+def _split_credentials(url: str) -> tuple[str, tuple[str, str] | None]:
+    """Return ``url`` without its userinfo, and the credentials it carried."""
+    try:
+        parts = urlsplit(url)
+        username, password = parts.username, parts.password
+    except ValueError:
+        return url, None
+    if username is None and password is None:
+        return url, None
+    netloc = parts.netloc.rpartition("@")[2]
+    stripped = urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+    return stripped, (unquote(username or ""), unquote(password or ""))
+
 
 class OllamaProvider(ModelProvider):
     """Calls local models through the Ollama REST API (raw ``httpx``, no SDK)."""
@@ -54,10 +76,16 @@ class OllamaProvider(ModelProvider):
         timeout: float = 120.0,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        self._base_url = (
+        configured = (
             base_url or os.environ.get("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL
         ).rstrip("/")
+        # Credentials in the URL are moved out of it. They are still sent, as the
+        # same Basic auth header, but a URL is logged by the HTTP client on every
+        # request and a header is not.
+        self._base_url, auth = _split_credentials(configured)
         client_kwargs: dict[str, Any] = {"base_url": self._base_url, "timeout": timeout}
+        if auth is not None:
+            client_kwargs["auth"] = auth
         if transport is not None:
             # Primarily a testing seam: pass an ``httpx.MockTransport`` to exercise
             # the provider without a running server.
@@ -78,11 +106,11 @@ class OllamaProvider(ModelProvider):
         try:
             response = await self._client.post("/api/chat", json=payload)
         except httpx.ConnectError as exc:
-            raise ProviderError(_NOT_RUNNING_HINT, context={"base_url": self._base_url}) from exc
+            raise ProviderError(_NOT_RUNNING_HINT, context=self._request_context(exc)) from None
         except httpx.RequestError as exc:
             raise ProviderError(
-                f"Ollama request failed: {exc}", context={"base_url": self._base_url}
-            ) from exc
+                "Ollama request failed", context=self._request_context(exc)
+            ) from None
 
         self._raise_for_status(response, model)
         return self._from_api_response(response.json(), model)
@@ -119,11 +147,11 @@ class OllamaProvider(ModelProvider):
                     if obj.get("done"):
                         break
         except httpx.ConnectError as exc:
-            raise ProviderError(_NOT_RUNNING_HINT, context={"base_url": self._base_url}) from exc
+            raise ProviderError(_NOT_RUNNING_HINT, context=self._request_context(exc)) from None
         except httpx.RequestError as exc:
             raise ProviderError(
-                f"Ollama request failed: {exc}", context={"base_url": self._base_url}
-            ) from exc
+                "Ollama request failed", context=self._request_context(exc)
+            ) from None
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -196,20 +224,23 @@ class OllamaProvider(ModelProvider):
     def _raise_for_status(self, response: httpx.Response, model: str) -> None:
         """Turn a non-200 Ollama response into a clear :class:`ProviderResponseError`.
 
-        Ollama returns ``{"error": "..."}`` for problems such as a missing model or a
-        model that does not support tool calling; the message names the model so the
-        cause is obvious.
+        Ollama explains problems such as a missing model in its response body. That
+        body is not repeated; the message names the model and the context carries
+        the status code.
         """
         if response.status_code == 200:
             return
-        try:
-            detail = response.json().get("error", response.text)
-        except json.JSONDecodeError:
-            detail = response.text
+        # The response body is upstream text and is never repeated: see
+        # forge.models.providers._errors. The hint is this library's own.
+        hint = _STATUS_HINTS.get(response.status_code, "")
         raise ProviderResponseError(
-            f"Ollama API error for model {model!r}: {detail}",
+            f"Ollama API error for model {model!r}{hint}",
             context={"model": model, "status_code": response.status_code},
         )
+
+    def _request_context(self, exc: BaseException) -> dict[str, Any]:
+        """Where the request was going, without credentials, path or query."""
+        return {"base_url": endpoint_origin(self._base_url), "error_type": type(exc).__name__}
 
     @staticmethod
     def _from_api_response(data: dict[str, Any], model: str) -> ModelResponse:

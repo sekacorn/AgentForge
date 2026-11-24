@@ -21,11 +21,13 @@ explicit control. Every (synchronous) boto3 call is wrapped in
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import AsyncIterator
 from typing import Any
 
 from forge.exceptions import ProviderError
 from forge.models.base import ModelProvider, split_system
+from forge.models.providers._errors import error_context
 from forge.types import (
     FinishReason,
     Message,
@@ -35,6 +37,9 @@ from forge.types import (
     ToolSchema,
     Usage,
 )
+
+#: The shape of an AWS error code. Anything else is treated as upstream text.
+_ERROR_CODE = re.compile(r"[A-Za-z][A-Za-z0-9.]{0,63}")
 
 _BEDROCK_IMPORT_HINT = (
     "The 'boto3' package is required for BedrockProvider. "
@@ -101,10 +106,10 @@ class BedrockProvider(ModelProvider):
         try:
             # boto3 is synchronous; run it off the event loop.
             response = await asyncio.to_thread(self._client.converse, **request)
-        except NoCredentialsError as exc:
-            raise ProviderError(_NO_CREDENTIALS, context={"model": model}) from exc
+        except NoCredentialsError:
+            raise ProviderError(_NO_CREDENTIALS, context={"model": model}) from None
         except ClientError as exc:
-            raise self._map_client_error(exc, model) from exc
+            raise self._map_client_error(exc, model) from None
 
         return self._from_response(response, model)
 
@@ -138,24 +143,37 @@ class BedrockProvider(ModelProvider):
                 text = delta.get("text")
                 if isinstance(text, str) and text:
                     yield text
-        except NoCredentialsError as exc:
-            raise ProviderError(_NO_CREDENTIALS, context={"model": model}) from exc
+        except NoCredentialsError:
+            raise ProviderError(_NO_CREDENTIALS, context={"model": model}) from None
         except ClientError as exc:
-            raise self._map_client_error(exc, model) from exc
+            raise self._map_client_error(exc, model) from None
 
     # ------------------------------------------------------------------ #
     # Error mapping
     # ------------------------------------------------------------------ #
     def _map_client_error(self, exc: Any, model: str) -> ProviderError:
+        """Map a botocore ``ClientError`` without repeating the service's message.
+
+        The error code is kept only when it has the shape of an AWS error code.
+        The message is upstream text and is never repeated: see
+        ``forge.models.providers._errors``.
+        """
         code = ""
+        context = error_context(model, exc)
         response = getattr(exc, "response", None)
         if isinstance(response, dict):
-            code = response.get("Error", {}).get("Code", "")
+            raw_code = (response.get("Error") or {}).get("Code", "")
+            if isinstance(raw_code, str) and _ERROR_CODE.fullmatch(raw_code):
+                code = raw_code
+            status = (response.get("ResponseMetadata") or {}).get("HTTPStatusCode")
+            if isinstance(status, int) and not isinstance(status, bool):
+                context["status_code"] = status
+        context["code"] = code
         if code == "AccessDeniedException":
-            return ProviderError(_ACCESS_DENIED, context={"model": model, "code": code})
+            return ProviderError(_ACCESS_DENIED, context=context)
         if code in ("ResourceNotFoundException", "ValidationException"):
-            return ProviderError(_MODEL_NOT_ENABLED, context={"model": model, "code": code})
-        return ProviderError(f"Bedrock API error: {exc}", context={"model": model, "code": code})
+            return ProviderError(_MODEL_NOT_ENABLED, context=context)
+        return ProviderError("Bedrock API error", context=context)
 
     # ------------------------------------------------------------------ #
     # Translation: Forge types -> Converse wire format

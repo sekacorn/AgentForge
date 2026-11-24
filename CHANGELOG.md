@@ -64,6 +64,35 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   cut. If you logged or stored `ProviderResponseError` messages from 0.5.4 or
   earlier while pointing the provider at an endpoint you do not control,
   treat the key used there as exposed and rotate it.
+- **`AnthropicProvider`, `BedrockProvider` and `OllamaProvider` errors could
+  repeat upstream text, including credentials. Affects 0.5.4 and earlier.**
+  The same fault as the `OpenAIProvider` one above, in the other three
+  providers that call out:
+  - `AnthropicProvider` interpolated the upstream error into
+    `ProviderResponseError`, and all three of its errors kept the SDK
+    exception as their cause. A server or proxy that reflects request headers
+    could put the `x-api-key` value into the message or the traceback.
+  - `BedrockProvider` interpolated the botocore `ClientError`, which carries
+    the service's message, and kept it as the cause on every error path
+    including `stream()`.
+  - `OllamaProvider` repeated the response body of any non-200 answer and the
+    text of any transport error, which includes the request URL, and reported
+    its configured `base_url` verbatim in the error context. Ollama takes no
+    API key, but a `base_url` with credentials in it (`http://user:pass@host`)
+    exposed them this way.
+
+  Errors from all five network providers now carry only values this library
+  chose or measured: the model, the exception type, the HTTP status code, and
+  for Bedrock the AWS error code when it has the shape of one. The cause chain
+  is cut. One parametrized test runs every provider against an in-process
+  server that reflects the request's credentials, for 401, 429 and 500. If you
+  logged or stored provider error messages from 0.5.4 or earlier while using a
+  proxy, gateway or endpoint you do not control, treat the credential used
+  there as exposed and rotate it.
+- **`OllamaProvider` no longer leaves URL credentials in the request URL.**
+  Credentials in `base_url` are sent as the same Basic auth header as before
+  but are removed from the URL, because the HTTP client logs every request URL
+  at INFO. Affects 0.5.4 and earlier.
 - Errors raised by `OpenAICompatibleProvider` never carry the upstream message
   text, only the endpoint origin and a status code, and the cause chain is cut,
   so an API key reflected by a server cannot reach an exception, a log line or
@@ -80,6 +109,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   or the existence of a shared credentials file.
 
 ### Changed
+- Error messages from `AnthropicProvider`, `BedrockProvider` and
+  `OllamaProvider` no longer include the upstream explanation (see Security).
+  Code that matched on that text should read `error.context` instead:
+  `status_code`, `error_type`, and `code` for Bedrock. Ollama's 400 and 404
+  errors carry a fixed hint in place of the server's wording, and the
+  `base_url` in its error context is now the scheme, host and port only.
 - A host whose only AWS credentials come from an **instance profile** is no
   longer detected automatically, because detecting it is the network call that
   was removed. Set `bedrock_enabled = true` (`FORGE_BEDROCK_ENABLED=1`) to

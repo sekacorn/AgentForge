@@ -24,6 +24,7 @@ from forge.exceptions import (
     ProviderResponseError,
 )
 from forge.models.base import ModelProvider, split_system
+from forge.models.providers._errors import error_context
 from forge.types import (
     FinishReason,
     Message,
@@ -98,18 +99,20 @@ class AnthropicProvider(ModelProvider):
 
         try:
             response = await self._client.messages.create(**request)
+        # Upstream text is never repeated, and the cause chain is cut: see
+        # forge.models.providers._errors.
         except self._anthropic.AuthenticationError as exc:
             raise ProviderAuthError(
-                "Anthropic authentication failed", context={"model": model}
-            ) from exc
+                "Anthropic authentication failed", context=error_context(model, exc)
+            ) from None
         except self._anthropic.RateLimitError as exc:
             raise ProviderRateLimitError(
-                "Anthropic rate limit hit", context={"model": model}
-            ) from exc
+                "Anthropic rate limit hit", context=error_context(model, exc)
+            ) from None
         except self._anthropic.APIError as exc:
             raise ProviderResponseError(
-                f"Anthropic API error: {exc}", context={"model": model}
-            ) from exc
+                "Anthropic API error", context=error_context(model, exc)
+            ) from None
 
         return self._from_api_response(response, model)
 

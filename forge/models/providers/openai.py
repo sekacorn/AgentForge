@@ -23,6 +23,7 @@ from forge.exceptions import (
     ProviderResponseError,
 )
 from forge.models.base import ModelProvider, split_system
+from forge.models.providers._errors import error_context as _error_context
 from forge.types import (
     FinishReason,
     Message,
@@ -51,15 +52,6 @@ _FINISH_REASON_MAP = {
     "length": FinishReason.MAX_TOKENS,
     "content_filter": FinishReason.REFUSAL,
 }
-
-
-def _error_context(model: str, exc: BaseException) -> dict[str, Any]:
-    """Describe an upstream failure without repeating anything the server said."""
-    context: dict[str, Any] = {"model": model, "error_type": type(exc).__name__}
-    status = getattr(exc, "status_code", None)
-    if isinstance(status, int) and not isinstance(status, bool):
-        context["status_code"] = status
-    return context
 
 
 class OpenAIProvider(ModelProvider):
