@@ -54,6 +54,7 @@ nav:
     - Configuration: getting-started/configuration.md
   - Guides:
     - Providers: guides/providers.md
+    - Provider coverage: provider-coverage.md
     - Memory & RAG: guides/memory.md
     - Tools: guides/tools.md
     - Governance: guides/governance.md

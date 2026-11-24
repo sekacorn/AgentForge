@@ -303,6 +303,7 @@ class Orchestrator:
                     base_url=self.config.openai_compatible_base_url,
                     preset=self.config.openai_compatible_preset,
                     api_key_env=self.config.openai_compatible_api_key_env,
+                    presets_path=self.config.provider_presets_path,
                 )
             except (ForgeError, ImportError) as exc:
                 # ForgeError messages from this provider never contain the key.

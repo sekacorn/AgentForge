@@ -75,10 +75,81 @@ appears in an error, a log line or an event.
 Presets live in a versioned data file, `provider-presets.v1`. Each one records
 a base URL, a link to the vendor's documentation, the vendor's stated
 jurisdiction, and whether the endpoint is local or hosted. **A preset is data,
-not a claim.** This project has not contacted any vendor's API; every preset is
-marked `unreviewed`, and the provider is tested against a fake in-process
-server only. Two presets are marked `partial` because their vendors document
-known divergences.
+not a claim.** This project has not contacted any vendor's API. A preset marked
+`reviewed` had its base URL read on the vendor's documentation page on the
+recorded date, and nothing more; the provider itself is tested against a fake
+in-process server only. [Provider coverage](../provider-coverage.md) lists the
+status of each preset.
+
+### Overriding a preset's URL
+
+Set both. The URL wins, and the preset still supplies the key variable and the
+token parameter:
+
+```bash
+export FORGE_OPENAI_COMPATIBLE_PRESET=moonshot
+export FORGE_OPENAI_COMPATIBLE_BASE_URL=https://api.moonshot.ai/v1
+```
+
+Repointing a preset **resets its jurisdiction to `"unknown"`** and its hosting
+is derived from the new URL. A preset describes its vendor's documented
+endpoint, not wherever it was aimed, so the declaration does not follow you to
+a different host.
+
+### A custom endpoint with no preset
+
+```bash
+export FORGE_OPENAI_COMPATIBLE_BASE_URL=https://llm.example.com/v1
+export FORGE_OPENAI_COMPATIBLE_API_KEY_ENV=MY_ENDPOINT_KEY
+```
+
+Its jurisdiction is `"unknown"` and its hosting is derived from the URL. If
+you govern model use by jurisdiction, a policy that denies `unknown` will stop
+this endpoint until you describe it with a preset of your own.
+
+### Your own preset file
+
+Describe your endpoints in a file with the same schema as the shipped presets
+and point the configuration at it:
+
+```json
+{
+  "schema_version": "provider-presets.v1",
+  "presets": {
+    "company_gateway": {
+      "base_url": "https://llm.internal.example.com/v1",
+      "docs_url": "https://docs.internal.example.com/llm",
+      "jurisdiction": "DE",
+      "hosting": "hosted",
+      "api_key_env": "INTERNAL_LLM_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "reviewed_on": null,
+      "notes": ""
+    }
+  }
+}
+```
+
+```bash
+export FORGE_PROVIDER_PRESETS_PATH=/etc/forge/presets.json
+export FORGE_OPENAI_COMPATIBLE_PRESET=company_gateway
+```
+
+Your presets are loaded alongside the built-in ones and validated the same
+way: the declared hosting must agree with the URL, and only a local endpoint
+may have no jurisdiction.
+
+- **The jurisdiction you declare is reported as attested**
+  (`jurisdiction_verification: "attested"`), exactly like the shipped presets.
+  It is your statement, and nothing checks it.
+- **An id that collides with a built-in preset is an error**, never an
+  override. A silent override would change what a well-known name points at,
+  and its jurisdiction with it, while every log and policy went on showing the
+  familiar name. Choose a new id.
+- Events record where a preset came from in `provider_preset_source`
+  (`"built_in"` or `"user"`).
 
 The router only selects models that are registered. Register the models your
 endpoint serves, with their real prices, under the provider name
@@ -107,9 +178,9 @@ reported as free.
 ### Hosting and jurisdiction on every call
 
 Every `model.call.started` event carries `provider`, `hosting` and
-`jurisdiction`, for every provider. With a preset the jurisdiction is the
-vendor's stated one, which is attested and says nothing about where a packet
-travels. With a custom `base_url` the hosting is derived from the endpoint
+`jurisdiction`, for every provider, plus `jurisdiction_verification`. With a
+preset the jurisdiction is a stated one, reported as `attested`: it says
+nothing about where a packet travels. With a custom `base_url` the hosting is derived from the endpoint
 (loopback and private ranges are local; names are never resolved) and the
 jurisdiction is `"unknown"`. A provider this package knows nothing about is
 `"unknown"` on both counts, never assumed local.

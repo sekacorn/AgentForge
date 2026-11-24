@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import resources
+from pathlib import Path
 from typing import Any, Final
 
 from forge.exceptions import ConfigurationError
@@ -27,6 +28,11 @@ from forge.models.endpoints import HOSTED, LOCAL, UNKNOWN, endpoint_origin, host
 PRESETS_SCHEMA_VERSION: Final = "provider-presets.v1"
 PRESETS_FILENAME: Final = "provider-presets.json"
 NOT_APPLICABLE: Final = "not_applicable"
+ATTESTED: Final = "attested"
+BUILT_IN: Final = "built_in"
+USER: Final = "user"
+MAX_USER_PRESET_BYTES: Final = 1024 * 1024
+_DATE: Final = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 TOKEN_PARAMS: Final = ("max_tokens", "max_completion_tokens")
 
 _PRESET_ID: Final = re.compile(r"[a-z][a-z0-9_]{0,63}")
@@ -42,6 +48,7 @@ _PRESET_KEYS: Final = frozenset(
         "token_param",
         "compatibility",
         "review",
+        "reviewed_on",
         "notes",
     }
 )
@@ -71,6 +78,10 @@ class ProviderPreset:
     compatibility: str
     review: str
     notes: str
+    reviewed_on: str | None = None
+    #: ``"built_in"`` for a preset shipped with the package, ``"user"`` for one
+    #: loaded from an operator's own file.
+    source: str = BUILT_IN
 
 
 @dataclass(frozen=True)
@@ -87,13 +98,29 @@ class ProviderBlock:
     jurisdiction: str
     preset: str | None = None
     endpoint_origin: str | None = None
+    #: Where the preset came from: ``"built_in"``, ``"user"``, or ``None``.
+    preset_source: str | None = None
+
+    @property
+    def jurisdiction_verification(self) -> str:
+        """How much the jurisdiction value can be relied on.
+
+        A declared jurisdiction is always ``"attested"``, whether it came from
+        a preset shipped here or from an operator's own file: it is somebody's
+        statement about a vendor, and nothing in this package checks it.
+        """
+        if self.jurisdiction in (UNKNOWN, NOT_APPLICABLE):
+            return self.jurisdiction
+        return ATTESTED
 
     def to_event(self) -> dict[str, Any]:
         """Fields for a model-call event. Always carries all three core keys."""
         return {
             "hosting": self.hosting,
             "jurisdiction": self.jurisdiction,
+            "jurisdiction_verification": self.jurisdiction_verification,
             "provider_preset": self.preset,
+            "provider_preset_source": self.preset_source,
         }
 
     def to_policy_request(self, model: str) -> dict[str, dict[str, Any]]:
@@ -104,6 +131,7 @@ class ProviderBlock:
                 "name": self.preset or self.provider,
                 "hosting": self.hosting,
                 "jurisdiction": self.jurisdiction,
+                "jurisdiction_verification": self.jurisdiction_verification,
             },
         }
 
@@ -146,6 +174,17 @@ def _preset(preset_id: str, raw: object) -> ProviderPreset:
         raise ConfigurationError(f"Provider preset {preset_id!r} has an invalid compatibility.")
     if raw["review"] not in ("unreviewed", "reviewed"):
         raise ConfigurationError(f"Provider preset {preset_id!r} has an invalid review status.")
+    reviewed_on = raw["reviewed_on"]
+    if reviewed_on is not None and (
+        not isinstance(reviewed_on, str) or not _DATE.fullmatch(reviewed_on)
+    ):
+        raise ConfigurationError(f"Provider preset {preset_id!r} has an invalid reviewed_on date.")
+    # A review without a date cannot be checked, and a date without a review
+    # claims one by implication.
+    if (raw["review"] == "reviewed") != (reviewed_on is not None):
+        raise ConfigurationError(
+            f"Provider preset {preset_id!r}: reviewed_on is set exactly when review is 'reviewed'."
+        )
     if not isinstance(raw["notes"], str):
         raise ConfigurationError(f"Provider preset {preset_id!r} has invalid notes.")
     return ProviderPreset(
@@ -159,6 +198,7 @@ def _preset(preset_id: str, raw: object) -> ProviderPreset:
         compatibility=raw["compatibility"],
         review=raw["review"],
         notes=raw["notes"],
+        reviewed_on=reviewed_on,
     )
 
 
@@ -176,15 +216,57 @@ def parse_presets(document: object) -> dict[str, ProviderPreset]:
     return {preset_id: _preset(preset_id, raw) for preset_id, raw in presets.items()}
 
 
-def load_presets() -> dict[str, ProviderPreset]:
-    """Load the presets shipped with this package."""
+def load_built_in_presets() -> dict[str, ProviderPreset]:
+    """Load only the presets shipped with this package."""
     text = resources.files("forge.models").joinpath("data", PRESETS_FILENAME).read_text("utf-8")
     return parse_presets(json.loads(text))
 
 
-def get_preset(preset_id: str) -> ProviderPreset:
-    """Return one shipped preset, or refuse with the list of known ids."""
-    presets = load_presets()
+def load_user_presets(path: str | Path) -> dict[str, ProviderPreset]:
+    """Load an operator's own ``provider-presets.v1`` file.
+
+    The file uses the same schema as the shipped one and is validated the same
+    way. Every preset it yields is marked ``source="user"``.
+    """
+    file = Path(path)
+    try:
+        if not file.is_file():
+            raise ConfigurationError("The provider presets file does not exist.")
+        if file.stat().st_size > MAX_USER_PRESET_BYTES:
+            raise ConfigurationError("The provider presets file is too large.")
+        document = json.loads(file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        raise ConfigurationError("The provider presets file could not be read as JSON.") from None
+    return {
+        preset_id: replace(preset, source=USER)
+        for preset_id, preset in parse_presets(document).items()
+    }
+
+
+def load_presets(user_path: str | Path | None = None) -> dict[str, ProviderPreset]:
+    """Load the shipped presets, plus an operator's file when one is given.
+
+    A user preset whose id collides with a shipped one is an **error**, never
+    an override. A silent override would let a file change what a well-known
+    name points at, and its declared jurisdiction with it, while every log and
+    policy went on showing the familiar name.
+    """
+    presets = load_built_in_presets()
+    if user_path is None:
+        return presets
+    user = load_user_presets(user_path)
+    collisions = sorted(set(user) & set(presets))
+    if collisions:
+        raise ConfigurationError(
+            "A user preset may not reuse the id of a built-in preset.",
+            context={"colliding_presets": collisions},
+        )
+    return {**presets, **user}
+
+
+def get_preset(preset_id: str, user_path: str | Path | None = None) -> ProviderPreset:
+    """Return one preset, or refuse with the list of known ids."""
+    presets = load_presets(user_path)
     if preset_id not in presets:
         raise ConfigurationError(
             f"Unknown provider preset {preset_id!r}.",
@@ -212,6 +294,7 @@ def block_for_endpoint(
             jurisdiction=preset.jurisdiction,
             preset=preset.preset_id,
             endpoint_origin=endpoint_origin(preset.base_url),
+            preset_source=preset.source,
         )
     url = base_url or ""
     hosting = hosting_for(url)
