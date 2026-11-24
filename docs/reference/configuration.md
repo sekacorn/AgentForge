@@ -81,6 +81,9 @@ Logging and tracing behavior.
 | `observability` | `ObservabilityConfig` | See above | -- |
 | `api_keys` | `dict[str, SecretStr]` | `{}` | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` |
 | `ollama_base_url` | `SecretStr` | `"http://localhost:11434"` | `OLLAMA_BASE_URL` |
+| `openai_compatible_base_url` | `str \| None` | `None` | `FORGE_OPENAI_COMPATIBLE_BASE_URL` |
+| `openai_compatible_preset` | `str \| None` | `None` | `FORGE_OPENAI_COMPATIBLE_PRESET` |
+| `openai_compatible_api_key_env` | `str \| None` | `None` | `FORGE_OPENAI_COMPATIBLE_API_KEY_ENV` |
 | `memory_backend` | `"inmemory" \| "sqlite" \| "pgvector"` | `"inmemory"` | `FORGE_MEMORY_BACKEND` |
 | `memory_path` | `str` | `"forge_memory.db"` | `FORGE_MEMORY_PATH` |
 | `pgvector_dsn` | `str \| None` | `None` | `FORGE_PGVECTOR_DSN` |

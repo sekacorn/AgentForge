@@ -137,6 +137,16 @@ class ForgeConfig(BaseModel):
     #: orchestrator offers the Ollama provider when ``OLLAMA_BASE_URL`` is set
     #: explicitly; see ``Orchestrator._build_default_providers``.
     ollama_base_url: SecretStr = SecretStr("http://localhost:11434")
+    #: Base URL of an OpenAI-compatible endpoint (from
+    #: ``FORGE_OPENAI_COMPATIBLE_BASE_URL``). Overrides the preset's URL. The
+    #: ``openai_compatible`` provider is offered only when this or a preset is set.
+    openai_compatible_base_url: str | None = None
+    #: A named preset from ``provider-presets.v1`` (from
+    #: ``FORGE_OPENAI_COMPATIBLE_PRESET``), e.g. a vendor or ``local_vllm``.
+    openai_compatible_preset: str | None = None
+    #: Name of the environment variable holding the endpoint's API key (from
+    #: ``FORGE_OPENAI_COMPATIBLE_API_KEY_ENV``). The name, never the key.
+    openai_compatible_api_key_env: str | None = None
     #: Retrieval-memory backend (see ``forge.memory.build_memory``). ``"sqlite"``
     #: persists RAG state across restarts and needs the optional ``aiosqlite`` extra.
     memory_backend: MemoryBackend = "inmemory"
@@ -198,6 +208,13 @@ class ForgeConfig(BaseModel):
 
         if (ollama_url := os.environ.get("OLLAMA_BASE_URL")) is not None:
             self.ollama_base_url = SecretStr(ollama_url)
+
+        if (compat_url := os.environ.get("FORGE_OPENAI_COMPATIBLE_BASE_URL")) is not None:
+            self.openai_compatible_base_url = compat_url or None
+        if (compat_preset := os.environ.get("FORGE_OPENAI_COMPATIBLE_PRESET")) is not None:
+            self.openai_compatible_preset = compat_preset or None
+        if (compat_env := os.environ.get("FORGE_OPENAI_COMPATIBLE_API_KEY_ENV")) is not None:
+            self.openai_compatible_api_key_env = compat_env or None
 
         if (backend := os.environ.get("FORGE_MEMORY_BACKEND")) is not None:
             self.memory_backend = backend  # type: ignore[assignment]

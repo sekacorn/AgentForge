@@ -8,6 +8,32 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`OpenAICompatibleProvider`** (`forge.models.providers.openai_compatible`,
+  registry key `openai_compatible`): one generic provider for any endpoint that
+  speaks the Chat Completions API, configured by a named preset, a `base_url`,
+  or both. Vendor names appear only in the preset data, never in a module,
+  class or CLI name.
+- **Provider presets** as a versioned data file, `provider-presets.v1`, with a
+  JSON Schema. Each preset records a `base_url`, a documentation link, the
+  vendor's stated jurisdiction, and whether the endpoint is local or hosted.
+  A preset is data, not a claim: no vendor API was contacted by this project,
+  every preset is marked `review: unreviewed`, and the tests run against a fake
+  in-process server only.
+- Configuration fields `openai_compatible_base_url`,
+  `openai_compatible_preset` and `openai_compatible_api_key_env` (environment:
+  `FORGE_OPENAI_COMPATIBLE_BASE_URL`, `FORGE_OPENAI_COMPATIBLE_PRESET`,
+  `FORGE_OPENAI_COMPATIBLE_API_KEY_ENV`). The last names the environment
+  variable that holds the key; the key itself is never stored in configuration.
+  With none of these set, nothing changes: the `openai` provider is built
+  exactly as before.
+- Every `model.call.started` event now carries `hosting`, `jurisdiction` and
+  `provider_preset` beside `provider`, for every provider. Where nothing is
+  known the value is the literal `"unknown"`, never an omission. Hosting for a
+  custom `base_url` is derived from the endpoint, and its jurisdiction is
+  `"unknown"`. `RunContext.policy_request_block(model)` returns the same facts
+  in the `model` / `provider` shape a policy engine matches on.
+
 ### Security
 - **`OpenAIProvider` error messages could contain the API key. Affects 0.5.4
   and earlier.** A failed request raised `ProviderResponseError` with the
@@ -23,6 +49,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   cut. If you logged or stored `ProviderResponseError` messages from 0.5.4 or
   earlier while pointing the provider at an endpoint you do not control,
   treat the key used there as exposed and rotate it.
+- Errors raised by `OpenAICompatibleProvider` never carry the upstream message
+  text, only the endpoint origin and a status code, and the cause chain is cut,
+  so an API key reflected by a server cannot reach an exception, a log line or
+  an event.
 
 ### Fixed
 - **Constructing an `Orchestrator` no longer attempts a network call.** With

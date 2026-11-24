@@ -1,0 +1,127 @@
+{
+  "schema_version": "provider-presets.v1",
+  "notice": "Each preset records where a vendor documents an OpenAI-compatible endpoint. A preset is data, not a claim: nothing here asserts that a vendor's API was contacted or works. Jurisdiction is the vendor's stated corporate jurisdiction and is attested, not checked. 'review: unreviewed' means the base_url has not yet been confirmed against the linked documentation in this repository's history.",
+  "presets": {
+    "mistral": {
+      "base_url": "https://api.mistral.ai/v1",
+      "docs_url": "https://docs.mistral.ai/api/",
+      "jurisdiction": "FR",
+      "hosting": "hosted",
+      "api_key_env": "MISTRAL_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": ""
+    },
+    "deepseek": {
+      "base_url": "https://api.deepseek.com",
+      "docs_url": "https://api-docs.deepseek.com/",
+      "jurisdiction": "CN",
+      "hosting": "hosted",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": ""
+    },
+    "moonshot": {
+      "base_url": "https://api.moonshot.cn/v1",
+      "docs_url": "https://platform.moonshot.cn/docs",
+      "jurisdiction": "CN",
+      "hosting": "hosted",
+      "api_key_env": "MOONSHOT_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": "Kimi models."
+    },
+    "qwen": {
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "docs_url": "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
+      "jurisdiction": "CN",
+      "hosting": "hosted",
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": "Compatible mode of Alibaba Cloud Model Studio."
+    },
+    "groq": {
+      "base_url": "https://api.groq.com/openai/v1",
+      "docs_url": "https://console.groq.com/docs/openai",
+      "jurisdiction": "US",
+      "hosting": "hosted",
+      "api_key_env": "GROQ_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": ""
+    },
+    "together": {
+      "base_url": "https://api.together.xyz/v1",
+      "docs_url": "https://docs.together.ai/docs/openai-api-compatibility",
+      "jurisdiction": "US",
+      "hosting": "hosted",
+      "api_key_env": "TOGETHER_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": ""
+    },
+    "fireworks": {
+      "base_url": "https://api.fireworks.ai/inference/v1",
+      "docs_url": "https://docs.fireworks.ai/tools-sdks/openai-compatibility",
+      "jurisdiction": "US",
+      "hosting": "hosted",
+      "api_key_env": "FIREWORKS_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": ""
+    },
+    "gemini_openai": {
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "docs_url": "https://ai.google.dev/gemini-api/docs/openai",
+      "jurisdiction": "US",
+      "hosting": "hosted",
+      "api_key_env": "GEMINI_API_KEY",
+      "token_param": "max_tokens",
+      "compatibility": "partial",
+      "review": "unreviewed",
+      "notes": "A compatibility layer over a different native API. Tool calling and response_format are the usual divergence points."
+    },
+    "local_vllm": {
+      "base_url": "http://localhost:8000/v1",
+      "docs_url": "https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html",
+      "jurisdiction": "not_applicable",
+      "hosting": "local",
+      "api_key_env": null,
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": "Default port of the vLLM OpenAI-compatible server."
+    },
+    "local_lmstudio": {
+      "base_url": "http://localhost:1234/v1",
+      "docs_url": "https://lmstudio.ai/docs/app/api/endpoints/openai",
+      "jurisdiction": "not_applicable",
+      "hosting": "local",
+      "api_key_env": null,
+      "token_param": "max_tokens",
+      "compatibility": "documented",
+      "review": "unreviewed",
+      "notes": "Default port of the LM Studio local server."
+    },
+    "local_ollama_openai": {
+      "base_url": "http://localhost:11434/v1",
+      "docs_url": "https://github.com/ollama/ollama/blob/main/docs/openai.md",
+      "jurisdiction": "not_applicable",
+      "hosting": "local",
+      "api_key_env": null,
+      "token_param": "max_tokens",
+      "compatibility": "partial",
+      "review": "unreviewed",
+      "notes": "Ollama's OpenAI-compatible mode. Tool calling has differed from its native API, which the dedicated ollama provider uses."
+    }
+  }
+}

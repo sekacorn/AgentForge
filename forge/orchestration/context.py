@@ -56,6 +56,17 @@ class RunContext:
     _reserved_tokens: int = field(default=0, init=False, repr=False)
     _budget_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
 
+    def policy_request_block(self, model_name: str) -> dict[str, dict[str, Any]]:
+        """The ``model`` and ``provider`` blocks of a policy request for a model.
+
+        Always carries provider, hosting and jurisdiction, with the literal
+        ``"unknown"`` where nothing is known, so a policy that denies unknown
+        jurisdictions or hosted models has something to match.
+        """
+        from forge.models.presets import describe_provider
+
+        return describe_provider(self.provider_for(model_name)).to_policy_request(model_name)
+
     def provider_for(self, model_name: str) -> ModelProvider:
         """Resolve the provider instance that serves ``model_name``."""
         info = self.registry.get(model_name)
