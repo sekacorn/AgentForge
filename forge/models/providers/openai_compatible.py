@@ -60,6 +60,7 @@ class OpenAICompatibleProvider(OpenAIProvider):
         api_key_env: str | None = None,
         token_param: str | None = None,
         http_client: Any | None = None,
+        presets_path: str | None = None,
     ) -> None:
         """Create the provider from a preset, a ``base_url``, or both.
 
@@ -67,8 +68,10 @@ class OpenAICompatibleProvider(OpenAIProvider):
         environment variable holding the key and overrides the preset's;
         ``api_key`` is for tests and programmatic callers. A hosted endpoint
         with no key is refused here rather than at the first request.
+        ``presets_path`` names an operator's own preset file, loaded beside the
+        built-in presets.
         """
-        chosen: ProviderPreset | None = get_preset(preset) if preset else None
+        chosen: ProviderPreset | None = get_preset(preset, presets_path) if preset else None
         url = base_url or (chosen.base_url if chosen else None)
         if not url:
             raise ConfigurationError(

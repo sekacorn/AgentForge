@@ -2,18 +2,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/sekacorn/agentforge-oss/schemas/provider-presets.schema.json",
   "title": "provider-presets.v1",
-  "description": "Named presets for OpenAI-compatible endpoints. A preset records where a vendor documents such an endpoint; it never asserts that the vendor's API was contacted or works.",
+  "description": "Named presets for OpenAI-compatible endpoints. A preset records where a vendor documents such an endpoint; it never asserts that the vendor's API was contacted or works. The same schema is used for the presets shipped with the package and for a user-supplied file.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "presets"],
+  "required": [
+    "schema_version",
+    "presets"
+  ],
   "properties": {
-    "schema_version": { "const": "provider-presets.v1" },
-    "notice": { "type": "string", "maxLength": 2048 },
+    "schema_version": {
+      "const": "provider-presets.v1"
+    },
+    "notice": {
+      "type": "string",
+      "maxLength": 2048
+    },
     "presets": {
       "type": "object",
       "minProperties": 1,
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
-      "additionalProperties": { "$ref": "#/$defs/preset" }
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/preset"
+      }
     }
   },
   "$defs": {
@@ -29,33 +41,100 @@
         "token_param",
         "compatibility",
         "review",
+        "reviewed_on",
         "notes"
       ],
       "properties": {
-        "base_url": { "type": "string", "pattern": "^https?://", "maxLength": 2048 },
-        "docs_url": { "type": "string", "pattern": "^https://", "maxLength": 2048 },
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://",
+          "maxLength": 2048
+        },
+        "docs_url": {
+          "type": "string",
+          "pattern": "^https://",
+          "maxLength": 2048
+        },
         "jurisdiction": {
           "description": "The vendor's stated corporate jurisdiction as an ISO 3166-1 alpha-2 code, or not_applicable for a local endpoint. Attested, never checked.",
           "type": "string",
           "pattern": "^([A-Z]{2}|not_applicable)$"
         },
-        "hosting": { "enum": ["local", "hosted"] },
+        "hosting": {
+          "enum": [
+            "local",
+            "hosted"
+          ]
+        },
         "api_key_env": {
           "description": "Name of the environment variable that holds the key. Never the key.",
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^[A-Z][A-Z0-9_]{0,127}$"
         },
-        "token_param": { "enum": ["max_tokens", "max_completion_tokens"] },
+        "token_param": {
+          "enum": [
+            "max_tokens",
+            "max_completion_tokens"
+          ]
+        },
         "compatibility": {
           "description": "documented: the vendor documents an OpenAI-compatible endpoint. partial: known divergence, described in notes.",
-          "enum": ["documented", "partial"]
+          "enum": [
+            "documented",
+            "partial"
+          ]
         },
         "review": {
-          "description": "unreviewed: base_url not yet confirmed against docs_url in this repository's history. reviewed: confirmed against the documentation only, never against the live API.",
-          "enum": ["unreviewed", "reviewed"]
+          "description": "unreviewed: base_url not confirmed against docs_url. reviewed: base_url read on the vendor's documentation page at docs_url on the date in reviewed_on. Documentation only, never the live API.",
+          "enum": [
+            "unreviewed",
+            "reviewed"
+          ]
         },
-        "notes": { "type": "string", "maxLength": 1024 }
-      }
+        "notes": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "reviewed_on": {
+          "description": "The date docs_url was read, or null for an unreviewed preset.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "review": {
+                "const": "reviewed"
+              }
+            },
+            "required": [
+              "review"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reviewed_on": {
+                "type": "string"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "reviewed_on": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

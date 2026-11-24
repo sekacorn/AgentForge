@@ -101,14 +101,8 @@ def test_a_presets_hosting_agrees_with_its_own_endpoint(preset_id: str) -> None:
 def test_partial_compatibility_is_recorded_with_a_reason() -> None:
     partial = {pid: p for pid, p in load_presets().items() if p.compatibility == "partial"}
 
-    assert set(partial) == {"gemini_openai", "local_ollama_openai"}
+    assert set(partial) == {"gemini_openai", "local_ollama_openai", "qwen"}
     assert all(preset.notes for preset in partial.values())
-
-
-def test_no_preset_claims_to_have_been_reviewed_yet() -> None:
-    # "reviewed" means confirmed against the vendor's documentation. That has
-    # not been done in this repository, so no preset may say it has.
-    assert {preset.review for preset in load_presets().values()} == {"unreviewed"}
 
 
 def test_the_data_file_matches_its_json_schema() -> None:
@@ -260,7 +254,12 @@ def test_the_policy_request_block_has_the_shape_a_policy_engine_matches() -> Non
 
     assert block.to_policy_request("some-model") == {
         "model": {"provider": "openai_compatible", "name": "some-model", "hosting": "hosted"},
-        "provider": {"name": "groq", "hosting": "hosted", "jurisdiction": "US"},
+        "provider": {
+            "name": "groq",
+            "hosting": "hosted",
+            "jurisdiction": "US",
+            "jurisdiction_verification": "attested",
+        },
     }
 
 
@@ -447,3 +446,191 @@ async def test_the_run_context_builds_a_policy_request_block(orchestrator) -> No
 
     assert block["model"] == {"provider": "echo", "name": captured["model"], "hosting": "local"}
     assert block["provider"]["jurisdiction"] == "not_applicable"
+
+
+# --- documentation review ---------------------------------------------------
+
+
+def test_a_reviewed_preset_records_the_date_its_documentation_was_read() -> None:
+    presets = load_presets()
+    reviewed = {pid for pid, preset in presets.items() if preset.review == "reviewed"}
+
+    # "reviewed" means the base_url was read on the vendor's documentation
+    # page, never that the vendor's API was contacted.
+    assert reviewed == EXPECTED_PRESETS - {"mistral"}
+    for preset_id in reviewed:
+        assert presets[preset_id].reviewed_on == "2026-11-24"
+    assert presets["mistral"].reviewed_on is None
+    assert presets["mistral"].notes
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"review": "reviewed", "reviewed_on": None},
+        {"review": "unreviewed", "reviewed_on": "2026-11-24"},
+        {"review": "reviewed", "reviewed_on": "yesterday"},
+    ],
+)
+def test_a_review_and_its_date_must_agree(mutation: dict) -> None:
+    document = _raw_document()
+    document["presets"] = {"local_vllm": {**document["presets"]["local_vllm"], **mutation}}
+
+    with pytest.raises(ConfigurationError, match="reviewed_on"):
+        parse_presets(document)
+
+
+# --- user-supplied preset files --------------------------------------------
+
+
+def _user_file(tmp_path, presets: dict) -> str:
+    path = tmp_path / "my-presets.json"
+    path.write_text(
+        json.dumps({"schema_version": PRESETS_SCHEMA_VERSION, "presets": presets}),
+        encoding="utf-8",
+    )
+    return str(path)
+
+
+def _user_preset(**overrides) -> dict:
+    preset = {
+        "base_url": "https://llm.internal.example.com/v1",
+        "docs_url": "https://docs.internal.example.com/llm",
+        "jurisdiction": "DE",
+        "hosting": "hosted",
+        "api_key_env": "INTERNAL_LLM_KEY",
+        "token_param": "max_tokens",
+        "compatibility": "documented",
+        "review": "unreviewed",
+        "reviewed_on": None,
+        "notes": "",
+    }
+    preset.update(overrides)
+    return preset
+
+
+def test_a_user_file_is_loaded_alongside_the_built_in_presets(tmp_path) -> None:
+    path = _user_file(tmp_path, {"company_gateway": _user_preset()})
+
+    presets = load_presets(path)
+
+    assert set(presets) > EXPECTED_PRESETS
+    assert presets["company_gateway"].source == "user"
+    assert presets["mistral"].source == "built_in"
+    assert set(load_presets()) == EXPECTED_PRESETS
+
+
+def test_a_user_presets_jurisdiction_is_reported_as_attested(tmp_path) -> None:
+    path = _user_file(tmp_path, {"company_gateway": _user_preset()})
+    preset = get_preset("company_gateway", path)
+
+    block = block_for_endpoint("openai_compatible", preset=preset, base_url=None)
+
+    assert (block.jurisdiction, block.jurisdiction_verification) == ("DE", "attested")
+    assert block.preset_source == "user"
+    assert block.to_event()["jurisdiction_verification"] == "attested"
+    assert block.to_event()["provider_preset_source"] == "user"
+    assert block.to_policy_request("m")["provider"]["jurisdiction_verification"] == "attested"
+
+
+def test_a_built_in_jurisdiction_is_attested_too() -> None:
+    # Shipping a value here does not make it verified: it is still somebody's
+    # statement about a vendor.
+    block = block_for_endpoint("openai_compatible", preset=get_preset("groq"), base_url=None)
+
+    assert block.jurisdiction_verification == "attested"
+    assert block.preset_source == "built_in"
+
+
+def test_unknown_and_local_jurisdictions_are_not_called_attested() -> None:
+    unknown = block_for_endpoint("openai_compatible", preset=None, base_url="https://x.example/v1")
+    local = block_for_endpoint("openai_compatible", preset=None, base_url="http://localhost:1/v1")
+
+    assert unknown.jurisdiction_verification == "unknown"
+    assert local.jurisdiction_verification == "not_applicable"
+
+
+def test_a_user_preset_may_not_reuse_a_built_in_id(tmp_path) -> None:
+    # Never a silent override: that would change what a well-known name points
+    # at, and its jurisdiction, while logs and policies kept showing the name.
+    path = _user_file(tmp_path, {"mistral": _user_preset(), "company_gateway": _user_preset()})
+
+    with pytest.raises(ConfigurationError, match="may not reuse the id") as raised:
+        load_presets(path)
+
+    assert raised.value.context["colliding_presets"] == ["mistral"]
+
+
+def test_repointing_a_user_preset_resets_its_jurisdiction(tmp_path) -> None:
+    path = _user_file(tmp_path, {"company_gateway": _user_preset()})
+    preset = get_preset("company_gateway", path)
+
+    block = block_for_endpoint(
+        "openai_compatible", preset=preset, base_url="https://elsewhere.example.com/v1"
+    )
+
+    assert (block.jurisdiction, block.preset, block.preset_source) == ("unknown", None, None)
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["", "not json", "[]", '{"schema_version": "provider-presets.v1"}'],
+)
+def test_a_malformed_user_file_is_refused(tmp_path, content: str) -> None:
+    path = tmp_path / "bad.json"
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(ConfigurationError):
+        load_presets(str(path))
+
+
+def test_a_missing_user_file_is_refused_without_echoing_its_path(tmp_path) -> None:
+    missing = tmp_path / "secret-project-name" / "presets.json"
+
+    with pytest.raises(ConfigurationError) as raised:
+        load_presets(str(missing))
+
+    assert "secret-project-name" not in str(raised.value)
+
+
+def test_a_user_preset_is_validated_like_a_built_in_one(tmp_path) -> None:
+    path = _user_file(tmp_path, {"company_gateway": _user_preset(hosting="local")})
+
+    with pytest.raises(ConfigurationError, match="base_url contradicts"):
+        load_presets(path)
+
+
+def test_the_orchestrator_wires_a_user_preset_from_config(
+    clean_env: pytest.MonkeyPatch, tmp_path
+) -> None:
+    constructor = _fake_openai(clean_env)
+    path = _user_file(tmp_path, {"company_gateway": _user_preset()})
+    clean_env.setenv("FORGE_PROVIDER_PRESETS_PATH", path)
+    clean_env.setenv("FORGE_OPENAI_COMPATIBLE_PRESET", "company_gateway")
+    clean_env.setenv("INTERNAL_LLM_KEY", "sk-internal-fake")
+
+    config = ForgeConfig.from_env()
+    orchestrator = Orchestrator(config=config)
+
+    assert config.provider_presets_path == path
+    block = orchestrator.providers["openai_compatible"].provider_block
+    assert (block.preset, block.preset_source, block.jurisdiction) == (
+        "company_gateway",
+        "user",
+        "DE",
+    )
+    assert constructor.call_args.kwargs["base_url"] == "https://llm.internal.example.com/v1"
+
+
+def test_a_colliding_user_file_leaves_the_provider_unwired_and_says_why(
+    clean_env: pytest.MonkeyPatch, tmp_path, forge_logs: _Records
+) -> None:
+    _fake_openai(clean_env)
+    path = _user_file(tmp_path, {"groq": _user_preset()})
+    clean_env.setenv("FORGE_PROVIDER_PRESETS_PATH", path)
+    clean_env.setenv("FORGE_OPENAI_COMPATIBLE_PRESET", "groq")
+
+    orchestrator = Orchestrator(config=ForgeConfig.from_env())
+
+    assert "openai_compatible" not in orchestrator.providers
+    assert "may not reuse the id" in forge_logs.text

@@ -147,6 +147,10 @@ class ForgeConfig(BaseModel):
     #: Name of the environment variable holding the endpoint's API key (from
     #: ``FORGE_OPENAI_COMPATIBLE_API_KEY_ENV``). The name, never the key.
     openai_compatible_api_key_env: str | None = None
+    #: Path to an operator's own ``provider-presets.v1`` file (from
+    #: ``FORGE_PROVIDER_PRESETS_PATH``), loaded beside the built-in presets. An id
+    #: that collides with a built-in preset is an error, never an override.
+    provider_presets_path: str | None = None
     #: Retrieval-memory backend (see ``forge.memory.build_memory``). ``"sqlite"``
     #: persists RAG state across restarts and needs the optional ``aiosqlite`` extra.
     memory_backend: MemoryBackend = "inmemory"
@@ -215,6 +219,8 @@ class ForgeConfig(BaseModel):
             self.openai_compatible_preset = compat_preset or None
         if (compat_env := os.environ.get("FORGE_OPENAI_COMPATIBLE_API_KEY_ENV")) is not None:
             self.openai_compatible_api_key_env = compat_env or None
+        if (presets_path := os.environ.get("FORGE_PROVIDER_PRESETS_PATH")) is not None:
+            self.provider_presets_path = presets_path or None
 
         if (backend := os.environ.get("FORGE_MEMORY_BACKEND")) is not None:
             self.memory_backend = backend  # type: ignore[assignment]

@@ -18,8 +18,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   JSON Schema. Each preset records a `base_url`, a documentation link, the
   vendor's stated jurisdiction, and whether the endpoint is local or hosted.
   A preset is data, not a claim: no vendor API was contacted by this project,
-  every preset is marked `review: unreviewed`, and the tests run against a fake
-  in-process server only.
+  and the tests run against a fake in-process server only.
 - Configuration fields `openai_compatible_base_url`,
   `openai_compatible_preset` and `openai_compatible_api_key_env` (environment:
   `FORGE_OPENAI_COMPATIBLE_BASE_URL`, `FORGE_OPENAI_COMPATIBLE_PRESET`,
@@ -33,6 +32,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   custom `base_url` is derived from the endpoint, and its jurisdiction is
   `"unknown"`. `RunContext.policy_request_block(model)` returns the same facts
   in the `model` / `provider` shape a policy engine matches on.
+
+- **User-supplied preset files.** `provider_presets_path`
+  (`FORGE_PROVIDER_PRESETS_PATH`) names a `provider-presets.v1` file of your
+  own, loaded alongside the built-in presets and validated the same way. A
+  jurisdiction declared there is reported as attested, like the shipped ones.
+  An id that collides with a built-in preset is an error, never a silent
+  override.
+- `model.call.started` events also carry `jurisdiction_verification`
+  (`attested`, `unknown` or `not_applicable`) and `provider_preset_source`
+  (`built_in` or `user`).
+- `docs/provider-coverage.md` lists each preset's status. Ten of the eleven
+  presets had their `base_url` read on the vendor's documentation on
+  2026-11-24 and are marked `reviewed` with that date; one is left
+  `unreviewed`. A review reads documentation only. No vendor API was
+  contacted. The review corrected one preset's host and three documentation
+  links, and marked one more preset `partial`.
 
 ### Security
 - **`OpenAIProvider` error messages could contain the API key. Affects 0.5.4
