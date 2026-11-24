@@ -206,3 +206,90 @@ def test_the_default_prefixes_are_the_documented_data():
 
     assert module.DEFAULT_COMPLETION_TOKEN_MODEL_PREFIXES == ("o",)
     assert module.TOKEN_PARAMS == ("max_tokens", "max_completion_tokens")
+
+
+# --- the API key never reaches an error -------------------------------------
+
+_LEAK_KEY = "sk-fake-leak-test-4b1d9e77-do-not-log"
+
+
+def _rendered(error: BaseException) -> str:
+    """Everything a logger, an audit sink or a traceback could print."""
+    import traceback
+
+    return "\n".join(
+        [
+            str(error),
+            repr(error),
+            repr(getattr(error, "context", None)),
+            repr(error.__cause__),
+            "".join(traceback.format_exception(type(error), error, error.__traceback__)),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("error_name", "expected"),
+    [
+        ("AuthenticationError", "ProviderAuthError"),
+        ("RateLimitError", "ProviderRateLimitError"),
+        ("APIError", "ProviderResponseError"),
+    ],
+)
+async def test_an_upstream_message_containing_the_key_is_not_repeated(
+    monkeypatch, error_name, expected
+):
+    module, client = _install_fake_openai(monkeypatch)
+    upstream = getattr(module, error_name)(f"bad request with Bearer {_LEAK_KEY}")
+    upstream.status_code = 500
+    client.chat.completions.create.side_effect = upstream
+    from forge import exceptions
+    from forge.models.providers.openai import OpenAIProvider
+
+    provider = OpenAIProvider(api_key=_LEAK_KEY)
+    with pytest.raises(getattr(exceptions, expected)) as raised:
+        await provider.complete([Message.user("hi")], model="gpt-4o")
+
+    assert _LEAK_KEY not in _rendered(raised.value)
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__ is True
+    assert raised.value.context == {
+        "model": "gpt-4o",
+        "error_type": error_name,
+        "status_code": 500,
+    }
+
+
+@pytest.mark.parametrize("status", [401, 429, 500])
+async def test_a_server_that_reflects_the_authorization_header_cannot_leak_it(
+    monkeypatch, status, caplog
+):
+    # The real SDK against an in-process server that echoes the Authorization
+    # header in its error body: the worst case, where the upstream message
+    # itself contains the key. No socket is opened.
+    openai = pytest.importorskip("openai")
+    httpx = pytest.importorskip("httpx")
+    monkeypatch.delitem(sys.modules, "forge.models.providers.openai", raising=False)
+    from forge.exceptions import ProviderError
+    from forge.models.providers.openai import OpenAIProvider
+
+    def reflecting_server(request):
+        return httpx.Response(
+            status,
+            json={"error": {"message": f"rejected: {request.headers.get('authorization')}"}},
+        )
+
+    provider = OpenAIProvider(api_key=_LEAK_KEY)
+    provider._client = openai.AsyncOpenAI(
+        api_key=_LEAK_KEY,
+        base_url="http://localhost:9/v1",
+        max_retries=0,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(reflecting_server)),
+    )
+
+    with caplog.at_level("DEBUG"), pytest.raises(ProviderError) as raised:
+        await provider.complete([Message.user("hi")], model="gpt-4o")
+
+    assert _LEAK_KEY not in _rendered(raised.value)
+    assert _LEAK_KEY not in caplog.text
+    assert raised.value.context["status_code"] == status
