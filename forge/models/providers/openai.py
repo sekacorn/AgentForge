@@ -15,14 +15,17 @@ Forge's provider-agnostic types.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from forge.exceptions import (
+    ConfigurationError,
     ProviderAuthError,
     ProviderRateLimitError,
     ProviderResponseError,
 )
 from forge.models.base import ModelProvider, split_system
+from forge.models.endpoints import URL_CREDENTIALS_MESSAGE, endpoint_origin, url_has_credentials
 from forge.models.providers._errors import error_context as _error_context
 from forge.types import (
     FinishReason,
@@ -78,6 +81,13 @@ class OpenAIProvider(ModelProvider):
         """
         if token_param is not None and token_param not in TOKEN_PARAMS:
             raise ValueError(f"token_param must be one of {TOKEN_PARAMS}, not {token_param!r}.")
+        # The SDK reads OPENAI_BASE_URL itself when no base_url is passed, so
+        # that value is checked too. The URL is never echoed back.
+        effective_url = base_url or os.environ.get("OPENAI_BASE_URL")
+        if effective_url and url_has_credentials(effective_url):
+            raise ConfigurationError(
+                URL_CREDENTIALS_MESSAGE, context={"endpoint": endpoint_origin(effective_url)}
+            )
         self._token_param = token_param
         self._completion_token_model_prefixes = tuple(completion_token_model_prefixes)
         try:

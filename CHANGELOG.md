@@ -50,6 +50,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   links, and marked one more preset `partial`.
 
 ### Security
+- **`OpenAIProvider` and `OpenAICompatibleProvider` refuse a `base_url` that
+  contains credentials. Affects 0.5.4 and earlier.** A URL such as
+  `https://user:password@host/v1` was accepted and used, and the HTTP client
+  logs the request URL at INFO on every call, so the password reached the
+  logs. Such a URL now raises `ConfigurationError` at construction, for
+  `base_url`, for a preset's URL and for the SDK's own `OPENAI_BASE_URL`. The
+  error names the scheme and host only. Remove the credentials from the URL
+  and supply the key through `api_key` or its environment variable. If you ran
+  0.5.4 or earlier with credentials in a `base_url` and INFO logging on, treat
+  them as exposed and rotate them.
 - **`OpenAIProvider` error messages could contain the API key. Affects 0.5.4
   and earlier.** A failed request raised `ProviderResponseError` with the
   upstream error text interpolated into its message, and all three provider

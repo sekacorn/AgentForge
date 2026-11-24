@@ -35,7 +35,12 @@ from forge.exceptions import (
     ProviderRateLimitError,
     ProviderResponseError,
 )
-from forge.models.endpoints import HOSTED
+from forge.models.endpoints import (
+    HOSTED,
+    URL_CREDENTIALS_MESSAGE,
+    endpoint_origin,
+    url_has_credentials,
+)
 from forge.models.presets import ProviderBlock, ProviderPreset, block_for_endpoint, get_preset
 from forge.models.providers.openai import OpenAIProvider
 from forge.types import Message, ModelResponse, ToolSchema
@@ -79,6 +84,10 @@ class OpenAICompatibleProvider(OpenAIProvider):
             )
         if not url.startswith(("http://", "https://")):
             raise ConfigurationError("The openai_compatible base_url must be an http(s) URL.")
+        if url_has_credentials(url):
+            raise ConfigurationError(
+                URL_CREDENTIALS_MESSAGE, context={"endpoint": endpoint_origin(url)}
+            )
 
         self.provider_block: ProviderBlock = block_for_endpoint(
             self.name, preset=chosen, base_url=base_url
