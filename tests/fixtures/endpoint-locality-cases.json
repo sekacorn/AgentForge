@@ -148,6 +148,36 @@
       "why": "just above the benchmarking range: public"
     },
     {
+      "url": "http://240.0.0.1",
+      "local": false,
+      "why": "RFC 1112 reserved (240.0.0.0/4) is not private"
+    },
+    {
+      "url": "http://254.255.255.254",
+      "local": false,
+      "why": "RFC 1112 reserved, upper edge"
+    },
+    {
+      "url": "http://255.255.255.255",
+      "local": false,
+      "why": "limited broadcast is not this machine"
+    },
+    {
+      "url": "http://[::ffff:240.0.0.1]",
+      "local": false,
+      "why": "IPv4-mapped reserved"
+    },
+    {
+      "url": "http://[::ffff:255.255.255.255]",
+      "local": false,
+      "why": "IPv4-mapped limited broadcast"
+    },
+    {
+      "url": "http://239.255.255.255",
+      "local": false,
+      "why": "just below the reserved range: multicast, not local"
+    },
+    {
       "url": "http://[::1",
       "local": false,
       "why": "unparsable: not positively local"
