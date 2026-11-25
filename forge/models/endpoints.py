@@ -32,6 +32,30 @@ UNKNOWN: Final = "unknown"
 LOCAL_HOSTNAMES: Final = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})  # nosec B104
 
 
+#: Documentation (RFC 5737, RFC 3849) and benchmarking (RFC 2544) ranges.
+#: Python's ``is_private`` includes them, but they are neither this machine nor
+#: a private network, so an endpoint there is hosted. The same five ranges are
+#: excluded in AgentForge, ModelSwapBench and the AI Infrastructure Suite, and
+#: the shared ``endpoint-locality-cases.v1`` table pins all three.
+NOT_LOCAL_NETWORKS: Final = tuple(
+    ipaddress.ip_network(network)
+    for network in (
+        "192.0.2.0/24",
+        "198.51.100.0/24",
+        "203.0.113.0/24",
+        "198.18.0.0/15",
+        "2001:db8::/32",
+    )
+)
+
+
+def _in_not_local_network(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Whether ``address``, or the IPv4 address it maps, is in a range above."""
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    return any(address in network for network in NOT_LOCAL_NETWORKS)
+
+
 def endpoint_is_local(base_url: str) -> bool:
     """Whether ``base_url`` points at this machine or a private network."""
     try:
@@ -43,6 +67,8 @@ def endpoint_is_local(base_url: str) -> bool:
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
+        return False
+    if _in_not_local_network(address):
         return False
     return bool(address.is_private or address.is_loopback or address.is_link_local)
 

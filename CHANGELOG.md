@@ -8,6 +8,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **The documentation and benchmarking ranges are hosted, not local.**
+  `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`, `198.18.0.0/15` and
+  `2001:db8::/32`, and their IPv4-mapped forms. Python's `is_private`
+  includes them, so `endpoint_is_local` and `hosting_for` called an endpoint
+  there local, and events reported its hosting as local. Pinned by the AI
+  Infrastructure Suite's shared `endpoint-locality-cases.v1` table, vendored
+  in `tests/fixtures/`.
+
 ## [0.5.6] - 2026-11-24
 
 A security release that closes what 0.5.5 left open. **If you have a token in
