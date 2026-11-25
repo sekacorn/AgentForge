@@ -8,6 +8,35 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`PortableMemory`** (`forge.memory.portable`), an optional interface the
+  three bundled backends now implement: `list_records` (paged by ID),
+  `list_tombstones`, `import_records`, `delete_record`, `review_records` and
+  `embedding_scheme`. `Memory` itself is unchanged (`add` / `search` /
+  `clear`), so third-party backends keep working; one that does not implement
+  the new interface is simply not exportable. Phase 4a, checkpoint 3.
+- **Imported memory is untrusted.** Imports keep their IDs and land
+  `quarantined`: listed, but never returned by `search` until a reviewer
+  activates them. Re-importing an identical item is a no-op; the same ID with
+  different content is refused, never overwritten; an import carrying reserved
+  `_forge_*` metadata is refused; a record cannot set its own status or
+  provenance. Provenance (source system, export digest, original ID, import
+  time, importer) is stored apart from user metadata.
+- **Deletions stick.** `delete_record` removes an item and leaves a tombstone
+  holding only its ID and time; an import never resurrects a tombstoned ID,
+  and an item a reviewer rejected is never imported again. Tombstones survive
+  `clear()`.
+
+### Changed
+- **Additive storage migrations, applied on open.** SQLite gains `status` and
+  `provenance` columns (existing rows read as active and native) and tables for
+  tombstones, rejected IDs and a `forge_memory_meta` record of the store's
+  scheme and dimension, so even an empty store refuses to reopen at another
+  dimension. pgvector gains a nullable `item_id` column for imported IDs, a
+  unique index on each row's portable ID (`COALESCE(item_id, id::text)`, so the
+  IDs `add` and `search` return are unchanged), `status`, `provenance`, and
+  tombstone and rejected tables. Nothing is dropped or renamed.
+
 ## [0.5.8] - 2026-11-25
 
 A bug-fix release. **Memory search no longer returns wrong rankings when a
