@@ -8,6 +8,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`forge providers inventory`** writes a `provider-inventory.v1` document
+  for the configured providers, for the AI Infrastructure Suite's
+  `model_providers` lock-in vector. Endpoint origins only (scheme, host,
+  port); hosting is left for the suite to derive; jurisdiction is a preset's
+  stated value or `unknown`. Features in use, vendor-only features and their
+  reconstruction paths are never guessed: they come from a new
+  `provider-declarations.v1` file (schema in
+  `forge/models/data/provider-declarations.schema.json`), and a configured
+  provider without a declaration is refused. See the providers guide.
+- `Orchestrator.configured_providers(config)` returns the providers a default
+  run would build, without building the rest of the orchestrator.
+- A `suite-contract` CI job installs the suite from its main branch and checks
+  every inventory the command can write against the suite's schema and reader,
+  and this package's locality rule against the shared table.
+
 ### Fixed
 - **The documentation and benchmarking ranges are hosted, not local.**
   `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`, `198.18.0.0/15` and

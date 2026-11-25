@@ -1,0 +1,21 @@
+{
+  "schema_version": "provider-declarations.v1",
+  "providers": {
+    "openai_compatible": {
+      "tool_calling": true,
+      "streaming": false,
+      "vendor_only": [
+        {"feature": "server_side_prompt_cache", "reconstruction": "documented"}
+      ],
+      "models": ["model-large"],
+      "jurisdiction": "XA",
+      "fallback": {"available": true, "provider_id": "ollama"}
+    },
+    "ollama": {
+      "tool_calling": true,
+      "streaming": false,
+      "vendor_only": [],
+      "models": ["open-model-8b"]
+    }
+  }
+}

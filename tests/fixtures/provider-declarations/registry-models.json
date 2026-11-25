@@ -1,0 +1,10 @@
+{
+  "schema_version": "provider-declarations.v1",
+  "providers": {
+    "ollama": {
+      "tool_calling": false,
+      "streaming": false,
+      "vendor_only": []
+    }
+  }
+}

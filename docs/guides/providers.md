@@ -316,6 +316,64 @@ Override with `routing.default_provider` in `forge.toml` or `ForgeConfig`.
 
 ---
 
+## Writing a provider inventory
+
+`forge providers inventory` writes a `provider-inventory.v1` document for the
+providers Forge is configured with. The AI Infrastructure Suite reads it to
+score the `model_providers` lock-in vector of a vendor exit report.
+
+```bash
+forge providers inventory --declarations provider-declarations.json --output evidence/provider-inventory.json
+```
+
+**Which providers.** Exactly the ones a run would build from your
+configuration. The offline `echo` provider is a test double and is left out
+unless you declare it.
+
+**What Forge records itself.** Each provider's kind, preset, and endpoint
+**origin**: scheme, host and port only. Credentials, path and query never
+appear. Hosting is not written as a claim: the suite derives it from the
+origin, with the same rule Forge uses. A preset's stated jurisdiction is
+recorded as it is (attested); otherwise the jurisdiction is `unknown`.
+
+**What you must state.** Features in use and vendor-only features are never
+guessed. Every configured provider needs an entry in a
+`provider-declarations.v1` file, or the command refuses to write anything:
+
+```json
+{
+  "schema_version": "provider-declarations.v1",
+  "providers": {
+    "openai_compatible": {
+      "tool_calling": true,
+      "streaming": false,
+      "vendor_only": [
+        {"feature": "server_side_prompt_cache", "reconstruction": "documented"}
+      ],
+      "models": ["model-large"],
+      "jurisdiction": "XA",
+      "fallback": {"available": true, "provider_id": "ollama"}
+    },
+    "ollama": {"tool_calling": true, "streaming": false, "vendor_only": []}
+  }
+}
+```
+
+- `tool_calling`, `streaming` and `vendor_only` are required. An empty
+  `vendor_only` states that there are none.
+- `models` is optional. Without it, the models Forge's registry lists for that
+  provider are used, and the command prints a note saying so.
+- `jurisdiction` fills an unknown value, or withholds a preset's with
+  `unknown`. One that contradicts the preset's is refused, and a local
+  provider takes none.
+- `fallback.provider_id` must name another provider in the same inventory.
+- A declaration for a provider that is not configured is refused too.
+
+The schema ships as `forge/models/data/provider-declarations.schema.json`.
+
+Everything you declare is attested in the exit report: the suite lists each
+input in `attested_claims` and never treats it as verified.
+
 ## Adding a custom provider
 
 Implement the `ModelProvider` abstract base class:
