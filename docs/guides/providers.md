@@ -107,9 +107,40 @@ Its jurisdiction is `"unknown"` and its hosting is derived from the URL. If
 you govern model use by jurisdiction, a policy that denies `unknown` will stop
 this endpoint until you describe it with a preset of your own.
 
-A `base_url` must not contain credentials. `https://user:password@host/v1` is
-refused with a configuration error, because HTTP clients log the request URL.
-Supply the key through the environment variable instead.
+#### What a URL may contain
+
+Every URL you configure follows one rule: the provider base URLs, the
+`OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` and `OLLAMA_BASE_URL` variables the
+SDKs read, and the OpenTelemetry endpoint.
+
+- **Credentials (`user:password@host`) are refused.** Supply the key through
+  its environment variable.
+- **A fragment (`#...`) is refused.**
+- **A query string (`?...`) is refused.** HTTP clients log the request URL,
+  and a token placed in a query string reaches every log line.
+
+Each refusal is a configuration error that names the problem and never repeats
+the URL.
+
+#### Query parameters an endpoint requires
+
+Some endpoints need a parameter on every request, such as an `api-version`.
+Put it in `default_query` instead of the URL:
+
+```bash
+export FORGE_OPENAI_COMPATIBLE_BASE_URL=https://llm.example.com/v1
+export FORGE_OPENAI_COMPATIBLE_DEFAULT_QUERY='api-version=2024-06-01'
+```
+
+or, in code, `OpenAICompatibleProvider(..., default_query={"api-version": "2024-06-01"})`
+(and the same argument on `OpenAIProvider`).
+
+The values are sent on every request and treated as secrets everywhere else:
+they are `SecretStr` in the configuration, never part of the provider's
+description or events, never in an error, and redacted from the log lines of
+the HTTP client and the vendor SDKs. The variable is form-encoded
+(`key=value&key=value`); a repeated or empty parameter name is refused. None of
+the shipped presets needs one.
 
 ### Your own preset file
 

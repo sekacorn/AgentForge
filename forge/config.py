@@ -17,6 +17,7 @@ import os
 import tomllib
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import parse_qsl
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
@@ -123,6 +124,26 @@ class ObservabilityConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
 
+def _parse_default_query(raw: str) -> dict[str, SecretStr]:
+    """Parse a form-encoded ``key=value&key=value`` string. Never echoes a value."""
+    if not raw.strip():
+        return {}
+    try:
+        pairs = parse_qsl(raw, keep_blank_values=False, strict_parsing=True)
+    except ValueError:
+        raise ConfigurationError(
+            "FORGE_OPENAI_COMPATIBLE_DEFAULT_QUERY must be form-encoded key=value pairs."
+        ) from None
+    keys = [key for key, _ in pairs]
+    if not all(keys):
+        raise ConfigurationError(
+            "FORGE_OPENAI_COMPATIBLE_DEFAULT_QUERY has an empty parameter name."
+        )
+    if len(set(keys)) != len(keys):
+        raise ConfigurationError("FORGE_OPENAI_COMPATIBLE_DEFAULT_QUERY repeats a parameter.")
+    return {key: SecretStr(value) for key, value in pairs}
+
+
 class ForgeConfig(BaseModel):
     """Top-level configuration object passed to the :class:`Orchestrator`."""
 
@@ -147,6 +168,11 @@ class ForgeConfig(BaseModel):
     #: Name of the environment variable holding the endpoint's API key (from
     #: ``FORGE_OPENAI_COMPATIBLE_API_KEY_ENV``). The name, never the key.
     openai_compatible_api_key_env: str | None = None
+    #: Query parameters the openai_compatible endpoint requires on every request
+    #: (from ``FORGE_OPENAI_COMPATIBLE_DEFAULT_QUERY``, form-encoded, e.g.
+    #: ``api-version=2024-06-01``). A query string in the base URL is refused.
+    #: Values are secrets: never repeated in records, errors or logs.
+    openai_compatible_default_query: dict[str, SecretStr] = Field(default_factory=dict)
     #: Path to an operator's own ``provider-presets.v1`` file (from
     #: ``FORGE_PROVIDER_PRESETS_PATH``), loaded beside the built-in presets. An id
     #: that collides with a built-in preset is an error, never an override.
@@ -221,6 +247,8 @@ class ForgeConfig(BaseModel):
             self.openai_compatible_api_key_env = compat_env or None
         if (presets_path := os.environ.get("FORGE_PROVIDER_PRESETS_PATH")) is not None:
             self.provider_presets_path = presets_path or None
+        if (compat_query := os.environ.get("FORGE_OPENAI_COMPATIBLE_DEFAULT_QUERY")) is not None:
+            self.openai_compatible_default_query = _parse_default_query(compat_query)
 
         if (backend := os.environ.get("FORGE_MEMORY_BACKEND")) is not None:
             self.memory_backend = backend  # type: ignore[assignment]

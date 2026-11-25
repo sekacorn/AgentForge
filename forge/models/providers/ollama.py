@@ -21,13 +21,12 @@ import json
 import os
 from collections.abc import AsyncIterator
 from typing import Any
-from urllib.parse import unquote, urlsplit, urlunsplit
 
 import httpx
 
 from forge.exceptions import ProviderError, ProviderResponseError
 from forge.models.base import ModelProvider, split_system
-from forge.models.endpoints import endpoint_origin
+from forge.models.endpoints import check_configured_url, endpoint_origin
 from forge.types import (
     FinishReason,
     Message,
@@ -50,20 +49,6 @@ _STATUS_HINTS = {
 }
 
 
-def _split_credentials(url: str) -> tuple[str, tuple[str, str] | None]:
-    """Return ``url`` without its userinfo, and the credentials it carried."""
-    try:
-        parts = urlsplit(url)
-        username, password = parts.username, parts.password
-    except ValueError:
-        return url, None
-    if username is None and password is None:
-        return url, None
-    netloc = parts.netloc.rpartition("@")[2]
-    stripped = urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
-    return stripped, (unquote(username or ""), unquote(password or ""))
-
-
 class OllamaProvider(ModelProvider):
     """Calls local models through the Ollama REST API (raw ``httpx``, no SDK)."""
 
@@ -79,13 +64,11 @@ class OllamaProvider(ModelProvider):
         configured = (
             base_url or os.environ.get("OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL
         ).rstrip("/")
-        # Credentials in the URL are moved out of it. They are still sent, as the
-        # same Basic auth header, but a URL is logged by the HTTP client on every
-        # request and a header is not.
-        self._base_url, auth = _split_credentials(configured)
+        # Credentials, fragments and query strings are refused: the HTTP client
+        # logs every request URL, and this value is recorded in error context.
+        check_configured_url(configured)
+        self._base_url = configured
         client_kwargs: dict[str, Any] = {"base_url": self._base_url, "timeout": timeout}
-        if auth is not None:
-            client_kwargs["auth"] = auth
         if transport is not None:
             # Primarily a testing seam: pass an ``httpx.MockTransport`` to exercise
             # the provider without a running server.
