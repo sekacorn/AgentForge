@@ -9,6 +9,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **Reserved and limited-broadcast addresses are hosted, not local.**
+  `240.0.0.0/4` (RFC 1112 reserved) and `255.255.255.255`, and their
+  IPv4-mapped forms. Python's `is_private` includes them, so
+  `endpoint_is_local` and `hosting_for` called an endpoint there local.
+  Pinned by six new cases in the shared `endpoint-locality-cases.v1` table.
 - **The documentation and benchmarking ranges are hosted, not local.**
   `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`, `198.18.0.0/15` and
   `2001:db8::/32`, and their IPv4-mapped forms. Python's `is_private`
