@@ -1,0 +1,161 @@
+{
+  "schema_version": "endpoint-locality-cases.v1",
+  "description": "The shared table every copy of the no-DNS endpoint-locality rule must agree with: AgentForge's endpoint_is_local, ModelSwapBench's endpoint_is_local, and the AI Infrastructure Suite's origin_is_local. The suite's packaged copy is canonical.",
+  "cases": [
+    {
+      "url": "http://localhost:11434",
+      "local": true,
+      "why": "loopback name"
+    },
+    {
+      "url": "http://127.0.0.1:8000",
+      "local": true,
+      "why": "IPv4 loopback"
+    },
+    {
+      "url": "http://127.8.9.10",
+      "local": true,
+      "why": "IPv4 loopback range"
+    },
+    {
+      "url": "http://[::1]:8000",
+      "local": true,
+      "why": "IPv6 loopback"
+    },
+    {
+      "url": "http://0.0.0.0:8000",
+      "local": true,
+      "why": "unspecified address: a development server bound to this host"
+    },
+    {
+      "url": "http://10.0.0.7:8000",
+      "local": true,
+      "why": "RFC 1918"
+    },
+    {
+      "url": "http://172.16.4.2",
+      "local": true,
+      "why": "RFC 1918"
+    },
+    {
+      "url": "http://192.168.1.20:11434",
+      "local": true,
+      "why": "RFC 1918"
+    },
+    {
+      "url": "http://169.254.10.1",
+      "local": true,
+      "why": "IPv4 link-local"
+    },
+    {
+      "url": "http://[fe80::1]:8000",
+      "local": true,
+      "why": "IPv6 link-local"
+    },
+    {
+      "url": "http://[fd00::10]:8000",
+      "local": true,
+      "why": "IPv6 unique local"
+    },
+    {
+      "url": "http://[::ffff:10.0.0.1]",
+      "local": true,
+      "why": "IPv4-mapped private"
+    },
+    {
+      "url": "http://[::ffff:127.0.0.1]",
+      "local": true,
+      "why": "IPv4-mapped loopback"
+    },
+    {
+      "url": "http://ollama.internal:11434",
+      "local": false,
+      "why": "a name is never resolved"
+    },
+    {
+      "url": "https://llm.vendor-a.example",
+      "local": false,
+      "why": "public name"
+    },
+    {
+      "url": "http://100.64.0.1:11434",
+      "local": false,
+      "why": "RFC 6598 shared address space is not private"
+    },
+    {
+      "url": "http://[::ffff:100.64.0.1]",
+      "local": false,
+      "why": "IPv4-mapped shared address space"
+    },
+    {
+      "url": "http://192.0.2.1",
+      "local": false,
+      "why": "RFC 5737 TEST-NET-1"
+    },
+    {
+      "url": "http://192.0.2.255",
+      "local": false,
+      "why": "RFC 5737 TEST-NET-1 upper edge"
+    },
+    {
+      "url": "http://198.51.100.7",
+      "local": false,
+      "why": "RFC 5737 TEST-NET-2"
+    },
+    {
+      "url": "http://203.0.113.7:11434",
+      "local": false,
+      "why": "RFC 5737 TEST-NET-3"
+    },
+    {
+      "url": "http://198.18.0.1",
+      "local": false,
+      "why": "RFC 2544 benchmarking"
+    },
+    {
+      "url": "http://198.19.255.254",
+      "local": false,
+      "why": "RFC 2544 benchmarking upper edge"
+    },
+    {
+      "url": "http://[2001:db8::1]:8000",
+      "local": false,
+      "why": "RFC 3849 IPv6 documentation"
+    },
+    {
+      "url": "http://[2001:db8:ffff::1]",
+      "local": false,
+      "why": "RFC 3849 IPv6 documentation, other subnet"
+    },
+    {
+      "url": "http://[::ffff:203.0.113.5]",
+      "local": false,
+      "why": "IPv4-mapped TEST-NET-3"
+    },
+    {
+      "url": "http://[::ffff:198.18.0.1]",
+      "local": false,
+      "why": "IPv4-mapped benchmarking"
+    },
+    {
+      "url": "http://198.17.255.254",
+      "local": false,
+      "why": "just below the benchmarking range: public"
+    },
+    {
+      "url": "http://198.20.0.1",
+      "local": false,
+      "why": "just above the benchmarking range: public"
+    },
+    {
+      "url": "http://[::1",
+      "local": false,
+      "why": "unparsable: not positively local"
+    },
+    {
+      "url": "http://",
+      "local": false,
+      "why": "no host"
+    }
+  ]
+}
