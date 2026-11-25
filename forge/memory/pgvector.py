@@ -12,9 +12,12 @@ so the core library works without them. Install with::
 
 Use it as an async context manager::
 
-    async with PGVectorMemoryStore("postgresql://user:pass@host/db") as store:
+    async with PGVectorMemoryStore("postgresql://forge@db-host:5432/forge") as store:
         await store.add("a fact to remember")
         hits = await store.search("a query")
+
+Keep the password out of the DSN: asyncpg reads it from ``PGPASSWORD`` or a
+``.pgpass`` file, so the DSN names only the user, host, port and database.
 """
 
 from __future__ import annotations
