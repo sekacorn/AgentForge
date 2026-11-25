@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-11-25
+
+A bug-fix release. **Memory search no longer returns wrong rankings when a
+store's vectors and its configured dimension differ**: it raises
+`MemoryDimensionError` instead. The pgvector examples and the missing-DSN
+error also stop showing a database password inside the DSN (use
+`PGPASSWORD` or a `.pgpass` file). No API is removed or changed.
+
 ### Fixed
 - **Memory search no longer compares vectors of different dimensions.**
   `SQLiteMemoryStore.search` paired the query vector with each stored vector
