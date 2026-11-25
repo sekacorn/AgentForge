@@ -27,6 +27,7 @@ does pass through is scrubbed of the key first.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from typing import Any
 
 from forge.exceptions import (
@@ -37,9 +38,7 @@ from forge.exceptions import (
 )
 from forge.models.endpoints import (
     HOSTED,
-    URL_CREDENTIALS_MESSAGE,
-    endpoint_origin,
-    url_has_credentials,
+    check_configured_url,
 )
 from forge.models.presets import ProviderBlock, ProviderPreset, block_for_endpoint, get_preset
 from forge.models.providers.openai import OpenAIProvider
@@ -66,6 +65,7 @@ class OpenAICompatibleProvider(OpenAIProvider):
         token_param: str | None = None,
         http_client: Any | None = None,
         presets_path: str | None = None,
+        default_query: Mapping[str, str] | None = None,
     ) -> None:
         """Create the provider from a preset, a ``base_url``, or both.
 
@@ -74,7 +74,8 @@ class OpenAICompatibleProvider(OpenAIProvider):
         ``api_key`` is for tests and programmatic callers. A hosted endpoint
         with no key is refused here rather than at the first request.
         ``presets_path`` names an operator's own preset file, loaded beside the
-        built-in presets.
+        built-in presets. ``default_query`` holds parameters the endpoint
+        requires on every request; a query string in the URL is refused.
         """
         chosen: ProviderPreset | None = get_preset(preset, presets_path) if preset else None
         url = base_url or (chosen.base_url if chosen else None)
@@ -84,10 +85,7 @@ class OpenAICompatibleProvider(OpenAIProvider):
             )
         if not url.startswith(("http://", "https://")):
             raise ConfigurationError("The openai_compatible base_url must be an http(s) URL.")
-        if url_has_credentials(url):
-            raise ConfigurationError(
-                URL_CREDENTIALS_MESSAGE, context={"endpoint": endpoint_origin(url)}
-            )
+        check_configured_url(url)
 
         self.provider_block: ProviderBlock = block_for_endpoint(
             self.name, preset=chosen, base_url=base_url
@@ -114,6 +112,7 @@ class OpenAICompatibleProvider(OpenAIProvider):
             token_param=token_param or (chosen.token_param if chosen else "max_tokens"),
             completion_token_model_prefixes=(),
             http_client=http_client,
+            default_query=default_query,
         )
 
     def __repr__(self) -> str:

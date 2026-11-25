@@ -16,16 +16,20 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from typing import Any
 
 from forge.exceptions import (
-    ConfigurationError,
     ProviderAuthError,
     ProviderRateLimitError,
     ProviderResponseError,
 )
 from forge.models.base import ModelProvider, split_system
-from forge.models.endpoints import URL_CREDENTIALS_MESSAGE, endpoint_origin, url_has_credentials
+from forge.models.endpoints import (
+    check_configured_url,
+    redact_query_values_in_logs,
+    validate_default_query,
+)
 from forge.models.providers._errors import error_context as _error_context
 from forge.types import (
     FinishReason,
@@ -70,6 +74,7 @@ class OpenAIProvider(ModelProvider):
         token_param: str | None = None,
         completion_token_model_prefixes: tuple[str, ...] = DEFAULT_COMPLETION_TOKEN_MODEL_PREFIXES,
         http_client: Any | None = None,
+        default_query: Mapping[str, str] | None = None,
     ) -> None:
         """Create the provider.
 
@@ -78,16 +83,19 @@ class OpenAIProvider(ModelProvider):
         choice is made per model from ``completion_token_model_prefixes``, whose
         default reproduces the behaviour this provider has always had against
         OpenAI's own API.
+
+        ``default_query`` holds query parameters an endpoint requires on every
+        request, such as an ``api-version``. A query string in ``base_url`` is
+        refused; these values are sent but kept out of records and logs.
         """
         if token_param is not None and token_param not in TOKEN_PARAMS:
             raise ValueError(f"token_param must be one of {TOKEN_PARAMS}, not {token_param!r}.")
         # The SDK reads OPENAI_BASE_URL itself when no base_url is passed, so
         # that value is checked too. The URL is never echoed back.
         effective_url = base_url or os.environ.get("OPENAI_BASE_URL")
-        if effective_url and url_has_credentials(effective_url):
-            raise ConfigurationError(
-                URL_CREDENTIALS_MESSAGE, context={"endpoint": endpoint_origin(effective_url)}
-            )
+        if effective_url:
+            check_configured_url(effective_url)
+        query = validate_default_query(default_query)
         self._token_param = token_param
         self._completion_token_model_prefixes = tuple(completion_token_model_prefixes)
         try:
@@ -106,6 +114,9 @@ class OpenAIProvider(ModelProvider):
             client_kwargs["base_url"] = base_url
         if http_client is not None:
             client_kwargs["http_client"] = http_client
+        if query:
+            client_kwargs["default_query"] = query
+            redact_query_values_in_logs(query.values())
         try:
             self._client = openai.AsyncOpenAI(**client_kwargs)
         except Exception as exc:  # e.g. missing key when none in env
