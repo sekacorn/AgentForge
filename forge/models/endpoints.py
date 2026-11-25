@@ -32,9 +32,10 @@ UNKNOWN: Final = "unknown"
 LOCAL_HOSTNAMES: Final = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})  # nosec B104
 
 
-#: Documentation (RFC 5737, RFC 3849) and benchmarking (RFC 2544) ranges.
+#: Documentation (RFC 5737, RFC 3849), benchmarking (RFC 2544), reserved
+#: (RFC 1112, 240.0.0.0/4) and limited broadcast (255.255.255.255) addresses.
 #: Python's ``is_private`` includes them, but they are neither this machine nor
-#: a private network, so an endpoint there is hosted. The same five ranges are
+#: a private network, so an endpoint there is hosted. The same ranges are
 #: excluded in AgentForge, ModelSwapBench and the AI Infrastructure Suite, and
 #: the shared ``endpoint-locality-cases.v1`` table pins all three.
 NOT_LOCAL_NETWORKS: Final = tuple(
@@ -44,6 +45,8 @@ NOT_LOCAL_NETWORKS: Final = tuple(
         "198.51.100.0/24",
         "203.0.113.0/24",
         "198.18.0.0/15",
+        "240.0.0.0/4",
+        "255.255.255.255/32",
         "2001:db8::/32",
     )
 )
