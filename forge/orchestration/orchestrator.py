@@ -40,6 +40,7 @@ from forge.models.providers.openai_compatible import OpenAICompatibleProvider
 from forge.models.registry import ModelRegistry
 from forge.models.router import ModelRouter
 from forge.observability.events import Event, EventBus, EventType
+from forge.observability.failures import RUN_FAILED, log_full_failure, public_failure
 from forge.observability.logging import configure_logging, get_logger
 from forge.observability.usage import UsageReport, UsageTracker
 from forge.orchestration.context import RunContext
@@ -220,9 +221,24 @@ class Orchestrator:
         except Exception as exc:
             # Audit and surface *any* failure (not only ForgeError) so the run's
             # outcome is always recorded, then re-raise for the caller to handle.
-            self.events.emit(EventType.RUN_FINISHED, run_id=run_id, success=False, error=str(exc))
+            # The audit record and the event say the type and a fixed message;
+            # the exception's own text goes to the local log only.
+            log_full_failure(exc, RUN_FAILED, run_id=run_id)
+            public = public_failure(exc, RUN_FAILED)
+            self.events.emit(
+                EventType.RUN_FINISHED,
+                run_id=run_id,
+                success=False,
+                error=public,
+                error_type=type(exc).__name__,
+            )
             self.audit.record(
-                "run.finish", actor=actor.id, run_id=run_id, outcome="error", error=str(exc)
+                "run.finish",
+                actor=actor.id,
+                run_id=run_id,
+                outcome="error",
+                error=public,
+                error_type=type(exc).__name__,
             )
             raise
 
@@ -304,6 +320,10 @@ class Orchestrator:
                     preset=self.config.openai_compatible_preset,
                     api_key_env=self.config.openai_compatible_api_key_env,
                     presets_path=self.config.provider_presets_path,
+                    default_query={
+                        key: value.get_secret_value()
+                        for key, value in self.config.openai_compatible_default_query.items()
+                    },
                 )
             except (ForgeError, ImportError) as exc:
                 # ForgeError messages from this provider never contain the key.

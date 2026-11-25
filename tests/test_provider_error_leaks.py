@@ -16,7 +16,6 @@ whose ``before-send`` hook answers in place of the network.
 
 from __future__ import annotations
 
-import base64
 import json
 import sys
 import traceback
@@ -31,6 +30,7 @@ from forge.models.base import ModelProvider
 from forge.types import Message
 
 _KEY = "sk-fake-leak-test-7c2e41aa-do-not-log"
+_UPSTREAM_MARKER = "upstream-text-3f9a-do-not-repeat"
 _AWS_KEY_ID = "AKIAFAKELEAKTEST0001"
 _AWS_SECRET = "fake-aws-secret-leak-test-do-not-log"  # noqa: S105 - not a real secret
 _STATUSES = [401, 429, 500]
@@ -53,7 +53,9 @@ class Reflector:
             if isinstance(value, bytes):
                 value = value.decode()
             values.append(f"{name}={value}")
-        message = "rejected, you sent " + " ".join(values)
+        # The marker stands for upstream text with no credential in it, for a
+        # provider such as Ollama that sends none: it must not be repeated either.
+        message = f"rejected {_UPSTREAM_MARKER}, you sent " + " ".join(values)
         self.sent.append(message)
         return message
 
@@ -122,13 +124,13 @@ def _anthropic(reflector: Reflector) -> tuple[ModelProvider, list[str]]:
 def _ollama(reflector: Reflector) -> tuple[ModelProvider, list[str]]:
     from forge.models.providers.ollama import OllamaProvider
 
-    # Ollama takes no key, but credentials in the URL are sent as Basic auth.
+    # Ollama takes no key, and credentials in its URL are refused, so nothing
+    # secret is sent. What must still never be repeated is the upstream text.
     provider = OllamaProvider(
-        base_url=f"http://operator:{_KEY}@localhost:11434",
+        base_url="http://localhost:11434",
         transport=httpx.MockTransport(reflector.http),
     )
-    basic = base64.b64encode(f"operator:{_KEY}".encode()).decode()
-    return provider, [_KEY, basic]
+    return provider, [_UPSTREAM_MARKER]
 
 
 class _Body:
@@ -283,10 +285,10 @@ async def test_an_ollama_transport_failure_does_not_repeat_the_url_or_the_error(
     from forge.models.providers.ollama import OllamaProvider
 
     def broken(request: httpx.Request) -> httpx.Response:
-        raise failure(f"could not reach {request.url} with {request.headers['authorization']}")
+        raise failure(f"could not reach {request.url} {_UPSTREAM_MARKER}")
 
     provider = OllamaProvider(
-        base_url=f"http://operator:{_KEY}@localhost:11434/secret-path",
+        base_url="http://localhost:11434/secret-path",
         transport=httpx.MockTransport(broken),
     )
 
@@ -294,7 +296,7 @@ async def test_an_ollama_transport_failure_does_not_repeat_the_url_or_the_error(
         await provider.complete([Message.user("hi")], model="some-model")
 
     rendered = _rendered(raised.value)
-    assert _KEY not in rendered
+    assert _UPSTREAM_MARKER not in rendered
     assert "secret-path" not in rendered
     assert "could not reach" not in rendered
     assert raised.value.context == {

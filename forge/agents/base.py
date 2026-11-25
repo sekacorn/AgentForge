@@ -18,6 +18,7 @@ from forge.models.base import ModelProvider
 from forge.models.presets import describe_provider
 from forge.models.router import Complexity
 from forge.observability.events import EventType
+from forge.observability.failures import MODEL_CALL_FAILED, log_full_failure, public_failure
 from forge.tools.registry import ToolRegistry
 from forge.types import FinishReason, Message, ModelResponse, ToolSchema, Usage
 
@@ -135,12 +136,16 @@ class BaseAgent(abc.ABC):
             await ctx.release_model_call(reservation)
             # Surface model/provider failures on the event stream (symmetric with
             # tool failures) before letting the error propagate and be audited.
+            # The event carries the type and a fixed message only: events reach
+            # telemetry. The full text stays in the local log.
+            log_full_failure(exc, MODEL_CALL_FAILED, run_id=ctx.run_id, agent=self.name)
             ctx.events.emit(
                 EventType.MODEL_CALL_FAILED,
                 run_id=ctx.run_id,
                 agent=self.name,
                 model=decision.model,
-                error=str(exc),
+                error=public_failure(exc, MODEL_CALL_FAILED),
+                error_type=type(exc).__name__,
             )
             raise
 
