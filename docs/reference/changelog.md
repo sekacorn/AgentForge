@@ -8,6 +8,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-25
+
+Adds `forge providers inventory`, which writes the `provider-inventory.v1`
+evidence the AI Infrastructure Suite's `model_providers` vector reads, and
+stops treating documentation, benchmarking, reserved and broadcast addresses
+as local. **Inventories that mark registry models or an SDK endpoint override
+need AI Infrastructure Suite 0.2.0b2 or later**; an inventory without either
+marker is also readable by 0.2.0b1. No breaking change: the new command is
+additive and every existing API is unchanged.
+
 ### Added
 - **`forge providers inventory`** writes a `provider-inventory.v1` document
   for the configured providers, for the AI Infrastructure Suite's
