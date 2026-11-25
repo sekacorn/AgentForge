@@ -8,6 +8,35 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **A token in a URL's query string was accepted and logged. Affects 0.5.5
+  and earlier.** 0.5.5 refused credentials in a `base_url` but accepted
+  `https://host/v1?key=...`, and the HTTP client logs the full request URL at
+  INFO, so the token reached any log that captured INFO output. Every
+  configured URL now follows one rule: credentials, fragments and query
+  strings are refused, for the provider base URLs, the `OPENAI_BASE_URL`,
+  `ANTHROPIC_BASE_URL` and `OLLAMA_BASE_URL` variables the SDKs read
+  themselves (`ANTHROPIC_BASE_URL` was not checked before), and the
+  OpenTelemetry endpoint (also not checked before). Errors never repeat the
+  URL. If you ran 0.5.5 or earlier with a token in a URL and INFO logging on,
+  treat the token as exposed and rotate it.
+
+### Added
+- **`default_query`** on `OpenAIProvider` and `OpenAICompatibleProvider`, and
+  `openai_compatible_default_query` (`FORGE_OPENAI_COMPATIBLE_DEFAULT_QUERY`,
+  form-encoded) in the configuration, for parameters an endpoint requires on
+  every request, such as an `api-version`. The values are sent but kept out of
+  records and logs: `SecretStr` in the configuration, absent from provider
+  descriptions, events and errors, and redacted from the log lines of the HTTP
+  client and the vendor SDKs. No shipped preset needs one.
+
+### Changed
+- **`OllamaProvider` refuses credentials in its URL** instead of moving them
+  into a Basic auth header, as 0.5.5 did. One rule now covers every configured
+  URL. Migration: remove `user:password@` from `OLLAMA_BASE_URL`; if your
+  Ollama sits behind an authenticating proxy, configure the proxy rather than
+  the URL.
+
 ## [0.5.5] - 2026-11-24
 
 Security release, with the OpenAI-compatible provider work. **Upgrade if you
