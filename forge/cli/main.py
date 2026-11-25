@@ -180,6 +180,15 @@ def providers_inventory(
         Path | None,
         typer.Option("--output", "-o", help="Write the inventory here instead of printing it."),
     ] = None,
+    use_registry_models: Annotated[
+        bool,
+        typer.Option(
+            "--use-registry-models",
+            help="For a provider whose models are not declared, take them from the model "
+            "registry, marked as from registry, not confirmed in use. Without this flag such "
+            "a provider is refused.",
+        ),
+    ] = False,
 ) -> None:
     """Write a provider-inventory.v1 for the configured providers."""
     from forge.models.inventory import build_inventory, load_declarations, render_inventory
@@ -187,7 +196,7 @@ def providers_inventory(
     try:
         declared = load_declarations(declarations)
         providers = Orchestrator.configured_providers(ForgeConfig.load())
-        result = build_inventory(providers, declared)
+        result = build_inventory(providers, declared, use_registry_models=use_registry_models)
     except ForgeError as exc:
         err_console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=2) from exc

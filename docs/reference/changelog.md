@@ -17,7 +17,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   reconstruction paths are never guessed: they come from a new
   `provider-declarations.v1` file (schema in
   `forge/models/data/provider-declarations.schema.json`), and a configured
-  provider without a declaration is refused. See the providers guide.
+  provider without a declaration is refused. Models in use are declared too: a
+  provider without them is refused unless `--use-registry-models` is passed,
+  and then its registry models are marked `"source": "registry"` (from
+  registry, not confirmed in use). An `openai` or `anthropic` provider at its
+  SDK default is marked `"endpoint_override_present": true` when
+  `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` is set: present, not reflected,
+  and the variable's value is never written. **An inventory that uses either
+  marker needs AI Infrastructure Suite 0.2.0b2 or later**; one that uses
+  neither is also readable by 0.2.0b1. See the providers guide.
 - `Orchestrator.configured_providers(config)` returns the providers a default
   run would build, without building the rest of the orchestrator.
 - A `suite-contract` CI job installs the suite from its main branch and checks

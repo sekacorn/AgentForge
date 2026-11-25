@@ -21,9 +21,23 @@ What comes from where:
 - **Features in use, vendor-only features and reconstruction paths, models,
   fallbacks**: operator-supplied in a ``provider-declarations.v1`` file and
   never guessed. A configured provider without a declaration is refused, and
-  so is a declaration for a provider that is not configured. Only the models
-  in use may fall back to this package's model registry for that provider,
-  and the command says when it does.
+  so is a declaration for a provider that is not configured.
+- **Models in use**: declared. A provider whose models are not declared is
+  refused unless the operator opts in with ``use_registry_models``
+  (``--use-registry-models``); its models are then this package's registry
+  entries for that provider, each marked ``"source": "registry"``: from
+  registry, not confirmed in use. The command says when it does this.
+- **Endpoint overrides**: an SDK-default provider (``openai``, ``anthropic``)
+  whose SDK would read an endpoint override from the environment
+  (``OPENAI_BASE_URL``, ``ANTHROPIC_BASE_URL``) is recorded with
+  ``"endpoint_override_present": true`` when that variable is set. The
+  override is present, not reflected: the origin stays null, so the suite
+  keeps treating the provider as the vendor's hosted default. The variable's
+  value is never read into the document.
+
+Both markers are written only when they carry information, so an inventory
+that uses neither stays readable by suite 0.2.0b1; one that uses either needs
+suite 0.2.0b2 or later.
 
 Errors never repeat a value from the declarations file or the configuration.
 """
@@ -32,6 +46,7 @@ from __future__ import annotations
 
 import json
 import re
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -64,6 +79,13 @@ _DECLARATION_KEYS: Final = frozenset(
     {"tool_calling", "streaming", "vendor_only", "models", "jurisdiction", "fallback"}
 )
 _REQUIRED_KEYS: Final = frozenset({"tool_calling", "streaming", "vendor_only"})
+#: The environment variable each SDK-default provider's SDK reads for an
+#: endpoint override. Present, not reflected: only its presence is recorded.
+SDK_ENDPOINT_OVERRIDE_ENV: Final = {
+    "openai": "OPENAI_BASE_URL",
+    "anthropic": "ANTHROPIC_BASE_URL",
+}
+REGISTRY_SOURCE: Final = "registry"
 
 
 @dataclass(frozen=True)
@@ -239,8 +261,14 @@ def _jurisdiction(block_value: str, declared: str | None, name: str) -> str:
 
 
 def _entry(
-    name: str, provider: object, declaration: Declaration, registry: ModelRegistry
-) -> tuple[dict[str, Any], str | None]:
+    name: str,
+    provider: object,
+    declaration: Declaration,
+    registry: ModelRegistry,
+    *,
+    use_registry_models: bool,
+    environ: Mapping[str, str],
+) -> tuple[dict[str, Any], tuple[str, ...]]:
     if name not in INVENTORY_KINDS:
         raise ConfigurationError(f"provider {name} is not a kind provider-inventory.v1 can record.")
     block = describe_provider(provider)
@@ -249,16 +277,37 @@ def _entry(
         raise ConfigurationError(f"provider {name}: its endpoint cannot be reduced to an origin.")
     if origin is None and name in ("ollama", "openai_compatible"):
         raise ConfigurationError(f"provider {name} has no endpoint to record.")
-    note = None
+    notes: list[str] = []
+    model_entries: list[dict[str, str]]
     if declaration.models is not None:
-        models = declaration.models
+        model_entries = [{"model": model} for model in declaration.models]
+    elif not use_registry_models:
+        raise ConfigurationError(
+            f"provider {name}: declare the models in use, or pass --use-registry-models "
+            "to take them from the model registry, marked as not confirmed in use."
+        )
     else:
         models = tuple(info.name for info in registry.all() if info.provider == name)
         if not models:
             raise ConfigurationError(
                 f"provider {name}: declare the models in use; the registry lists none for it."
             )
-        note = f"models in use for {name} were taken from the model registry"
+        model_entries = [{"model": model, "source": REGISTRY_SOURCE} for model in models]
+        notes.append(
+            f"models for {name} were taken from the model registry and are marked "
+            "from registry, not confirmed in use"
+        )
+    override_variable = SDK_ENDPOINT_OVERRIDE_ENV.get(name)
+    override = (
+        origin is None
+        and override_variable is not None
+        and bool(environ.get(override_variable, "").strip())
+    )
+    if override:
+        notes.append(
+            f"an endpoint override is set for {name} and is not reflected; "
+            "the inventory records the SDK default"
+        )
     jurisdiction = _jurisdiction(block.jurisdiction, declaration.jurisdiction, name)
     if (
         jurisdiction == NOT_APPLICABLE
@@ -274,8 +323,9 @@ def _entry(
         "preset": block.preset,
         "preset_source": block.preset_source if block.preset is not None else None,
         "endpoint_origin": origin,
+        **({"endpoint_override_present": True} if override else {}),
         "jurisdiction": jurisdiction,
-        "models": [{"model": model} for model in models],
+        "models": model_entries,
         "openai_compatible_fallback": {"available": declaration.fallback_available},
         "features": {
             "tool_calling": declaration.tool_calling,
@@ -292,7 +342,7 @@ def _entry(
         # Known hosted at a local-looking endpoint: a declaration may only add
         # hosted-ness, so say so rather than let it read as local.
         entry["hosting_declared"] = HOSTED
-    return entry, note
+    return entry, tuple(notes)
 
 
 def build_inventory(
@@ -300,9 +350,18 @@ def build_inventory(
     declarations: Mapping[str, Declaration],
     *,
     registry: ModelRegistry | None = None,
+    use_registry_models: bool = False,
+    environ: Mapping[str, str] | None = None,
 ) -> InventoryResult:
-    """Describe the configured providers as a ``provider-inventory.v1`` document."""
+    """Describe the configured providers as a ``provider-inventory.v1`` document.
+
+    ``use_registry_models`` lets a provider without declared models take them
+    from the registry, marked as not confirmed in use; without it such a
+    provider is refused. ``environ`` is where SDK endpoint overrides are looked
+    for, ``os.environ`` by default.
+    """
     registry = registry or ModelRegistry()
+    environ = os.environ if environ is None else environ
     included = [name for name in providers if name not in OFFLINE_PROVIDERS or name in declarations]
     undeclared = sorted(name for name in included if name not in declarations)
     if undeclared:
@@ -321,10 +380,16 @@ def build_inventory(
     entries: list[dict[str, Any]] = []
     notes: list[str] = []
     for name in sorted(included):
-        entry, note = _entry(name, providers[name], declarations[name], registry)
+        entry, entry_notes = _entry(
+            name,
+            providers[name],
+            declarations[name],
+            registry,
+            use_registry_models=use_registry_models,
+            environ=environ,
+        )
         entries.append(entry)
-        if note:
-            notes.append(note)
+        notes.extend(entry_notes)
     ids = {entry["provider_id"] for entry in entries}
     for entry in entries:
         target = entry["openai_compatible_fallback"].get("provider_id")

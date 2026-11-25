@@ -361,8 +361,12 @@ guessed. Every configured provider needs an entry in a
 
 - `tool_calling`, `streaming` and `vendor_only` are required. An empty
   `vendor_only` states that there are none.
-- `models` is optional. Without it, the models Forge's registry lists for that
-  provider are used, and the command prints a note saying so.
+- `models` states the models in use. A provider without it is **refused**,
+  unless you pass `--use-registry-models`: the models Forge's registry lists
+  for that provider are then written, each marked `"source": "registry"`
+  (from registry, not confirmed in use), and the command prints a note saying
+  so. The registry lists models the router *can* choose, not necessarily the
+  ones you use, so declaring them is better.
 - `jurisdiction` fills an unknown value, or withholds a preset's with
   `unknown`. One that contradicts the preset's is refused, and a local
   provider takes none.
@@ -370,6 +374,19 @@ guessed. Every configured provider needs an entry in a
 - A declaration for a provider that is not configured is refused too.
 
 The schema ships as `forge/models/data/provider-declarations.schema.json`.
+
+**SDK endpoint overrides.** `openai` and `anthropic` are recorded at their SDK
+default, with a null origin, which the suite treats as the vendor's hosted
+endpoint. If `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` is set, that provider
+is written with `"endpoint_override_present": true` and the command prints a
+note. The override is **present, not reflected**: the origin stays null and
+the suite keeps scoring the provider as hosted, which is conservative if the
+override points at a local proxy. The variable's value is never written.
+
+**Suite version.** Both markers are written only when they apply. An
+inventory that uses neither is readable by AI Infrastructure Suite 0.2.0b1;
+one that uses either needs suite **0.2.0b2 or later**, which lists both in the
+exit report's `attested_claims`.
 
 Everything you declare is attested in the exit report: the suite lists each
 input in `attested_claims` and never treats it as verified.

@@ -11,6 +11,7 @@ import jsonschema
 import pytest
 from tests.inventory_variants import (
     DECLARATIONS,
+    OVERRIDE_VALUE,
     Named,
     compatible,
     declarations,
@@ -181,12 +182,47 @@ def test_echo_is_left_out_unless_declared() -> None:
     )
 
 
-def test_registry_models_are_used_only_when_none_are_declared_and_the_command_says_so() -> None:
+def test_undeclared_models_are_refused_by_default() -> None:
+    with pytest.raises(ConfigurationError, match="--use-registry-models"):
+        build_inventory(
+            {"ollama": ollama()},
+            parse_declarations(declarations("registry-models.json")),
+            environ={},
+        )
+
+
+def test_registry_models_are_opt_in_marked_and_the_command_says_so() -> None:
     result = variants()["registry-models"]
-    models = [m["model"] for m in result.document["providers"][0]["models"]]
-    assert models and all(isinstance(name, str) for name in models)
-    assert result.notes == ("models in use for ollama were taken from the model registry",)
+    models = result.document["providers"][0]["models"]
+
+    assert models
+    assert all(set(entry) == {"model", "source"} for entry in models)
+    assert all(entry["source"] == "registry" for entry in models)
+    assert result.notes == (
+        "models for ollama were taken from the model registry and are marked "
+        "from registry, not confirmed in use",
+    )
+
+
+def test_declared_models_carry_no_source_marker() -> None:
+    # Emitted only when it carries information: a declared model is the default.
+    for name, result in variants().items():
+        if name == "registry-models":
+            continue
+        for provider in result.document["providers"]:
+            assert all(set(entry) == {"model"} for entry in provider["models"]), name
     assert variants()["local-only"].notes == ()
+
+
+def test_the_flag_does_not_override_declared_models() -> None:
+    result = build_inventory(
+        {"ollama": ollama()},
+        parse_declarations(_decl(ollama={**PLAIN, "models": ["open-model-8b"]})),
+        use_registry_models=True,
+        environ={},
+    )
+    assert result.document["providers"][0]["models"] == [{"model": "open-model-8b"}]
+    assert result.notes == ()
 
 
 def test_a_provider_with_no_registry_models_must_declare_them() -> None:
@@ -194,7 +230,64 @@ def test_a_provider_with_no_registry_models_must_declare_them() -> None:
         build_inventory(
             {"openai_compatible": compatible("http://127.0.0.1:8000/v1")},
             parse_declarations(_decl(openai_compatible=PLAIN)),
+            use_registry_models=True,
+            environ={},
         )
+
+
+# --- SDK endpoint overrides: present, not reflected ---------------------------------
+
+
+def test_an_sdk_endpoint_override_is_recorded_as_present_not_reflected() -> None:
+    result = variants()["sdk-default-with-override"]
+    providers = {p["provider_id"]: p for p in result.document["providers"]}
+
+    assert providers["openai"]["endpoint_override_present"] is True
+    assert providers["openai"]["endpoint_origin"] is None
+    assert "endpoint_override_present" not in providers["anthropic"]
+    assert result.notes == (
+        "an endpoint override is set for openai and is not reflected; "
+        "the inventory records the SDK default",
+    )
+    assert OVERRIDE_VALUE not in render_inventory(result)
+    assert "proxy" not in " ".join(result.notes)
+
+
+def test_without_an_override_the_marker_is_absent() -> None:
+    providers = variants()["sdk-default"].document["providers"]
+    assert all("endpoint_override_present" not in p for p in providers)
+
+
+@pytest.mark.parametrize(
+    ("variable", "provider"),
+    [("OPENAI_BASE_URL", "openai"), ("ANTHROPIC_BASE_URL", "anthropic")],
+)
+def test_each_sdk_reads_its_own_variable(variable: str, provider: str) -> None:
+    result = build_inventory(
+        {provider: Named(provider)},
+        parse_declarations(_decl(**{provider: {**PLAIN, "models": ["m"]}})),
+        environ={variable: OVERRIDE_VALUE},
+    )
+    assert result.document["providers"][0]["endpoint_override_present"] is True
+
+
+def test_a_blank_override_or_another_providers_variable_is_not_an_override() -> None:
+    for environ in ({"OPENAI_BASE_URL": "  "}, {"ANTHROPIC_BASE_URL": OVERRIDE_VALUE}):
+        result = build_inventory(
+            {"openai": Named("openai")},
+            parse_declarations(_decl(openai={**PLAIN, "models": ["m"]})),
+            environ=environ,
+        )
+        assert "endpoint_override_present" not in result.document["providers"][0]
+
+
+def test_a_provider_with_its_own_origin_never_records_an_override() -> None:
+    result = build_inventory(
+        {"openai_compatible": compatible("https://llm.vendor-a.example/v1")},
+        parse_declarations(_decl(openai_compatible={**PLAIN, "models": ["m"]})),
+        environ={"OPENAI_BASE_URL": OVERRIDE_VALUE},
+    )
+    assert "endpoint_override_present" not in result.document["providers"][0]
 
 
 def test_hosted_with_a_fallback_and_a_vendor_only_feature() -> None:
@@ -289,10 +382,10 @@ def test_only_echo_configured_refuses_a_declaration_for_a_real_provider() -> Non
 
 
 def test_a_fallback_must_name_another_provider_in_the_inventory() -> None:
-    bad = {**PLAIN, "fallback": {"available": True, "provider_id": "nobody"}}
+    bad = {**PLAIN, "models": ["m"], "fallback": {"available": True, "provider_id": "nobody"}}
     with pytest.raises(ConfigurationError, match="fallback must name another provider"):
         build_inventory({"ollama": ollama()}, parse_declarations(_decl(ollama=bad)))
-    itself = {**PLAIN, "fallback": {"available": True, "provider_id": "ollama"}}
+    itself = {**PLAIN, "models": ["m"], "fallback": {"available": True, "provider_id": "ollama"}}
     with pytest.raises(ConfigurationError, match="fallback must name another provider"):
         build_inventory({"ollama": ollama()}, parse_declarations(_decl(ollama=itself)))
 
@@ -325,7 +418,8 @@ def test_a_jurisdiction_that_contradicts_a_preset_or_a_local_provider_is_refused
     assert withheld.document["providers"][0]["jurisdiction"] == "unknown"
     with pytest.raises(ConfigurationError, match="local"):
         build_inventory(
-            {"ollama": ollama()}, parse_declarations(_decl(ollama={**PLAIN, "jurisdiction": "XA"}))
+            {"ollama": ollama()},
+            parse_declarations(_decl(ollama={**PLAIN, "models": ["m"], "jurisdiction": "XA"})),
         )
 
 
@@ -377,11 +471,42 @@ def test_the_command_prints_plain_json_and_notes_go_to_stderr(
     _patch_providers(monkeypatch, {"echo": Named("echo"), "ollama": ollama()})
     path = tmp_path / "decl.json"
     path.write_bytes(declarations("registry-models.json"))
+    result = runner.invoke(
+        app,
+        ["providers", "inventory", "--declarations", str(path), "--use-registry-models"],
+    )
+
+    assert result.exit_code == 0, result.output
+    provider = json.loads(result.stdout)["providers"][0]
+    assert provider["kind"] == "ollama"
+    assert {entry["source"] for entry in provider["models"]} == {"registry"}
+    assert "model registry" in result.stderr
+
+
+def test_the_command_refuses_undeclared_models_without_the_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_providers(monkeypatch, {"ollama": ollama()})
+    path = tmp_path / "decl.json"
+    path.write_bytes(declarations("registry-models.json"))
+    result = runner.invoke(app, ["providers", "inventory", "--declarations", str(path)])
+
+    assert result.exit_code == 2
+    assert "--use-registry-models" in result.output
+
+
+def test_the_command_records_an_override_from_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_providers(monkeypatch, {"openai": Named("openai")})
+    monkeypatch.setenv("OPENAI_BASE_URL", OVERRIDE_VALUE)
+    path = tmp_path / "decl.json"
+    path.write_bytes(_decl(openai={**PLAIN, "models": ["m"]}))
     result = runner.invoke(app, ["providers", "inventory", "--declarations", str(path)])
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.stdout)["providers"][0]["kind"] == "ollama"
-    assert "model registry" in result.stderr
+    assert json.loads(result.stdout)["providers"][0]["endpoint_override_present"] is True
+    assert OVERRIDE_VALUE not in result.output
 
 
 def test_the_command_writes_a_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -49,9 +49,16 @@ def compatible(base_url: str | None = None, preset: str | None = None) -> Descri
     )
 
 
-def _build(providers: dict[str, Any], declared: dict[str, Any]) -> InventoryResult:
+#: A placeholder override value. It must never appear in an inventory.
+OVERRIDE_VALUE: Final = "https://proxy.vendor-c.example/v1"
+
+
+def _build(providers: dict[str, Any], declared: dict[str, Any], **options: Any) -> InventoryResult:
     data = json.dumps({"schema_version": "provider-declarations.v1", "providers": declared})
-    return build_inventory(providers, parse_declarations(data.encode("utf-8")))
+    # An explicit, empty environment unless a variant sets one, so the CI
+    # runner's own environment never changes what a variant writes.
+    options.setdefault("environ", {})
+    return build_inventory(providers, parse_declarations(data.encode("utf-8")), **options)
 
 
 def variants() -> dict[str, InventoryResult]:
@@ -62,10 +69,13 @@ def variants() -> dict[str, InventoryResult]:
         "local-only": build_inventory(
             {"echo": Named("echo"), "ollama": ollama()},
             parse_declarations(declarations("local-only.json")),
+            environ={},
         ),
         "registry-models": build_inventory(
             {"echo": Named("echo"), "ollama": ollama()},
             parse_declarations(declarations("registry-models.json")),
+            use_registry_models=True,
+            environ={},
         ),
         "hosted-with-fallback": _build(
             {
@@ -88,6 +98,14 @@ def variants() -> dict[str, InventoryResult]:
         "documentation-range-is-hosted": _build(
             {"openai_compatible": compatible("http://203.0.113.7:8000/v1")},
             {"openai_compatible": {**plain, "models": ["model-x"]}},
+        ),
+        "sdk-default-with-override": _build(
+            {"anthropic": Named("anthropic"), "openai": Named("openai")},
+            {
+                "anthropic": {**plain, "models": ["vendor-b-model"]},
+                "openai": {**plain, "models": ["vendor-c-model"]},
+            },
+            environ={"OPENAI_BASE_URL": OVERRIDE_VALUE},
         ),
         "echo-declared": _build(
             {"echo": Named("echo")},
