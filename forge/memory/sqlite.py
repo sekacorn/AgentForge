@@ -27,7 +27,8 @@ import math
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from forge.memory.base import Memory, MemoryItem
+from forge.exceptions import MemoryDimensionError
+from forge.memory.base import Memory, MemoryItem, dimension_mismatch_message
 from forge.memory.vector import _stable_bucket, _tokenize
 from forge.types import new_id, utcnow
 
@@ -97,6 +98,18 @@ class SQLiteMemoryStore(Memory):
             conn = await aiosqlite.connect(self._path)
             await conn.execute(_CREATE_TABLE_SQL)
             await conn.commit()
+            # A store built at another dimension is refused before it can be
+            # searched or have vectors of a second dimension written into it.
+            cursor = await conn.execute("SELECT embedding FROM memories LIMIT 1")
+            row = await cursor.fetchone()
+            await cursor.close()
+            if row is not None:
+                stored = len(json.loads(row[0]))
+                if stored != self._dim:
+                    await conn.close()
+                    raise MemoryDimensionError(
+                        dimension_mismatch_message("SQLite", stored, self._dim)
+                    )
             self._conn = conn
             return conn
 
@@ -126,7 +139,12 @@ class SQLiteMemoryStore(Memory):
         scored: list[MemoryItem] = []
         for row in rows:
             vector: list[float] = json.loads(row[2])
-            score = sum(a * b for a, b in zip(query_vector, vector, strict=False))
+            if len(vector) != len(query_vector):
+                # A table written by an earlier version can hold two dimensions.
+                raise MemoryDimensionError(
+                    dimension_mismatch_message("SQLite", len(vector), len(query_vector))
+                )
+            score = sum(a * b for a, b in zip(query_vector, vector, strict=True))
             raw_metadata = row[3]
             metadata: dict[str, object] = json.loads(raw_metadata) if raw_metadata else {}
             scored.append(

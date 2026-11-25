@@ -108,3 +108,11 @@ class AccessDeniedError(SecurityError):
 
 class MemoryBackendError(ForgeError):
     """A memory/RAG backend failed."""
+
+
+class MemoryDimensionError(MemoryBackendError):
+    """A store's vectors and the configured embedding dimension disagree.
+
+    Comparing vectors of different lengths produces meaningless scores, so a
+    store refuses to search (or open) rather than return them.
+    """

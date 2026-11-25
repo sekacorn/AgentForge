@@ -31,6 +31,15 @@ class MemoryItem(BaseModel):
     score: float | None = None
 
 
+def dimension_mismatch_message(backend: str, stored: int, configured: int) -> str:
+    """The error text for a store whose vectors differ from its configured dimension."""
+    return (
+        f"{backend} memory store holds {stored}-dimension vectors but was opened with "
+        f"embedding dimension {configured}. Open it with the dimension it was built with, "
+        "or rebuild its vectors; comparing different dimensions gives wrong scores."
+    )
+
+
 class Memory(abc.ABC):
     """A searchable long-term memory / retrieval backend."""
 
