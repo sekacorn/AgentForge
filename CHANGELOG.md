@@ -8,6 +8,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+- **A failure's own text no longer leaves the local log.** When a worker
+  failed, the supervisor put the exception's text into the synthesis prompt it
+  sent to a model, and failure events and audit records stored it too. That
+  text is whatever raised it: in 0.5.4 and earlier it could be a provider's
+  reflected API key, and in any version it can be an upstream message, a URL or
+  a value from a request. Events also reach a collector through the
+  OpenTelemetry exporter. Synthesis prompts, the `run.finish` and
+  `worker.failed` audit records, and the `model.call.failed`, `worker.failed`
+  and `run.finished` events now carry only the exception type and a fixed
+  description, such as `RuntimeError: worker failed`. The full text, with its
+  traceback, is written to the local `forge.failures` log at WARNING.
+
+### Changed
+- The `error` field of those events and audit records is now
+  `"<ExceptionType>: <fixed description>"`, and a new `error_type` field holds
+  the type alone. Code that read the exception's message from them should read
+  the local `forge.failures` log instead.
+
 ## [0.5.5] - 2026-11-24
 
 Security release, with the OpenAI-compatible provider work. **Upgrade if you

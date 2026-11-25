@@ -20,6 +20,7 @@ from forge.agents.base import AgentResult, BaseAgent
 from forge.models.providers.echo import PLAN_MARKER, SYNTH_MARKER
 from forge.models.router import Complexity
 from forge.observability.events import EventType
+from forge.observability.failures import WORKER_FAILED, log_full_failure, public_failure
 from forge.tools.registry import ToolRegistry
 from forge.types import Message, Usage
 
@@ -161,13 +162,18 @@ class Supervisor(BaseAgent):
     ) -> AgentResult:
         """Turn a worker exception into a recorded, graceful error result."""
         ctx = self._ctx
+        # The worker's exception text never leaves the local log: not into the
+        # event, the audit record, or the synthesis prompt sent to a model.
+        log_full_failure(error, WORKER_FAILED, run_id=ctx.run_id, worker_id=worker_id)
+        public = public_failure(error, WORKER_FAILED)
         ctx.events.emit(
             EventType.WORKER_FAILED,
             run_id=ctx.run_id,
             agent=self.name,
             worker_id=worker_id,
             subtask=subtask,
-            error=str(error),
+            error=public,
+            error_type=type(error).__name__,
         )
         ctx.audit.record(
             "worker.failed",
@@ -176,13 +182,14 @@ class Supervisor(BaseAgent):
             outcome="error",
             resource=worker_id,
             subtask=subtask,
-            error=str(error),
+            error=public,
+            error_type=type(error).__name__,
         )
         # Preserve any partial spend the worker incurred before it failed.
         usage = ctx.usage.report().by_agent.get(worker_id, Usage())
         return AgentResult(
             agent=worker_id,
-            output=f"[failed] {subtask}: {error}",
+            output=f"[failed] {subtask}: {public}",
             usage=usage,
             steps=0,
             success=False,
