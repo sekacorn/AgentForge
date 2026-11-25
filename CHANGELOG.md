@@ -8,6 +8,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-24
+
+A security release that closes what 0.5.5 left open. **If you have a token in
+any URL's query string, move it: such a URL is now refused**, and the token
+was being logged. Two behaviours change on purpose, both under Changed:
+`OllamaProvider` refuses credentials in its URL instead of sending them as a
+header, and failure events and audit records now carry the exception type and
+a fixed description instead of the exception's own text.
+
 ### Security
 - **A token in a URL's query string was accepted and logged. Affects 0.5.5
   and earlier.** 0.5.5 refused credentials in a `base_url` but accepted
