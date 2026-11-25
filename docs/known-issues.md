@@ -49,3 +49,27 @@ repeat upstream text from 0.5.5.
 
 **Where it is.** `forge/security/sandbox.py`, the two `except` branches after
 the tool is invoked.
+
+## The pgvector DSN is held as a plain string
+
+**Status:** open. Present in 0.5.5 and earlier.
+
+**What happens.** `ForgeConfig.pgvector_dsn` (`FORGE_PGVECTOR_DSN`) is a
+PostgreSQL connection string, which includes the database password. It is
+stored as an ordinary `str`. `ollama_base_url` and the API keys are
+`SecretStr`, which masks them in `repr` and in serialized output; the DSN is
+not masked.
+
+Nothing in Forge prints or logs the configuration, so the password does not
+leak in normal operation. The risk is in your own code: `print(config)`,
+`config.model_dump()`, a debugger, or an error report that includes the
+configuration object would show the DSN in full.
+
+**Who is affected.** Anyone using the pgvector memory backend who logs,
+serializes or reports the `ForgeConfig` object.
+
+**What to do now.** Do not log or serialize the whole configuration. If you
+must, exclude the field: `config.model_dump(exclude={"pgvector_dsn"})`.
+
+**Planned fix.** Make the field a `SecretStr`, with an accessor so existing
+code that reads the DSN keeps working.
