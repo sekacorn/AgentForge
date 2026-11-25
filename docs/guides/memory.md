@@ -112,7 +112,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ```python
 from forge import PGVectorMemoryStore
 
-dsn = "postgresql://forge:forge@localhost:5432/forge"
+dsn = "postgresql://forge@localhost:5432/forge"  # password from PGPASSWORD or .pgpass
 async with PGVectorMemoryStore(dsn) as store:
     await store.add("Forge is an open-source multi-agent platform.")
     await store.add("pgvector enables real semantic vector search.")
@@ -140,8 +140,14 @@ An IVFFlat index with `lists=100` is created automatically for cosine distance.
 
 ```bash
 export FORGE_MEMORY_BACKEND=pgvector
-export FORGE_PGVECTOR_DSN="postgresql://user:pass@host:5432/db"
+export FORGE_PGVECTOR_DSN="postgresql://forge@db-host:5432/forge"
 ```
+
+Keep the password out of the DSN. asyncpg reads it from `PGPASSWORD` or a
+`.pgpass` file (libpq's password file format), so the DSN, which can end up in
+shell history, process listings and configuration dumps, names only the user,
+host, port and database. Provide `PGPASSWORD` from your secret store at runtime
+rather than writing it into a file in the repository.
 
 ### Custom table and dimensions
 
@@ -195,6 +201,6 @@ For pgvector:
 ```python
 config = ForgeConfig(
     memory_backend="pgvector",
-    pgvector_dsn="postgresql://forge:forge@localhost:5432/forge",
+    pgvector_dsn="postgresql://forge@localhost:5432/forge",  # password from PGPASSWORD
 )
 ```

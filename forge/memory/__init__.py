@@ -39,7 +39,8 @@ def build_memory(config: ForgeConfig) -> Memory:
 
             raise ConfigurationError(
                 "pgvector memory backend requires FORGE_PGVECTOR_DSN "
-                "(e.g. postgresql://user:pass@host/db)"
+                "(e.g. postgresql://forge@db-host:5432/forge; supply the password "
+                "through PGPASSWORD or a .pgpass file, not the DSN)"
             )
         return PGVectorMemoryStore(dsn)
     if config.memory_backend == "sqlite":
