@@ -22,6 +22,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from forge.models.endpoints import check_configured_url
 from forge.observability.events import Event, EventBus, EventType
 
 _OTEL_MISSING = "OTel export requires opentelemetry packages: pip install 'agentforge-oss[otel]'"
@@ -50,6 +51,10 @@ class OTelExporter:
             from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         except ImportError as exc:
             raise ImportError(_OTEL_MISSING) from exc
+
+        if endpoint:
+            # The exporter logs and reports its endpoint; refuse a secret in it.
+            check_configured_url(endpoint)
 
         self._trace = trace
         resource = Resource.create({"service.name": service_name})

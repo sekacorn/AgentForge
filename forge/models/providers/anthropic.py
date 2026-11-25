@@ -15,6 +15,7 @@ to and from Forge's provider-agnostic types.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from forge.exceptions import (
@@ -24,6 +25,7 @@ from forge.exceptions import (
     ProviderResponseError,
 )
 from forge.models.base import ModelProvider, split_system
+from forge.models.endpoints import check_configured_url
 from forge.models.providers._errors import error_context
 from forge.types import (
     FinishReason,
@@ -57,6 +59,12 @@ class AnthropicProvider(ModelProvider):
                 "The 'anthropic' package is required for AnthropicProvider. "
                 "Install it with: pip install 'agentforge-oss[anthropic]'"
             ) from exc
+
+        # The SDK reads ANTHROPIC_BASE_URL itself, so that value is checked
+        # here. The URL is never echoed back.
+        sdk_base_url = os.environ.get("ANTHROPIC_BASE_URL")
+        if sdk_base_url:
+            check_configured_url(sdk_base_url)
 
         self._anthropic = anthropic
         client_kwargs: dict[str, Any] = {}

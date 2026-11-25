@@ -320,6 +320,10 @@ class Orchestrator:
                     preset=self.config.openai_compatible_preset,
                     api_key_env=self.config.openai_compatible_api_key_env,
                     presets_path=self.config.provider_presets_path,
+                    default_query={
+                        key: value.get_secret_value()
+                        for key, value in self.config.openai_compatible_default_query.items()
+                    },
                 )
             except (ForgeError, ImportError) as exc:
                 # ForgeError messages from this provider never contain the key.
