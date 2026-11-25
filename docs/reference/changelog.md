@@ -8,6 +8,30 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`forge providers inventory`** writes a `provider-inventory.v1` document
+  for the configured providers, for the AI Infrastructure Suite's
+  `model_providers` lock-in vector. Endpoint origins only (scheme, host,
+  port); hosting is left for the suite to derive; jurisdiction is a preset's
+  stated value or `unknown`. Features in use, vendor-only features and their
+  reconstruction paths are never guessed: they come from a new
+  `provider-declarations.v1` file (schema in
+  `forge/models/data/provider-declarations.schema.json`), and a configured
+  provider without a declaration is refused. Models in use are declared too: a
+  provider without them is refused unless `--use-registry-models` is passed,
+  and then its registry models are marked `"source": "registry"` (from
+  registry, not confirmed in use). An `openai` or `anthropic` provider at its
+  SDK default is marked `"endpoint_override_present": true` when
+  `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` is set: present, not reflected,
+  and the variable's value is never written. **An inventory that uses either
+  marker needs AI Infrastructure Suite 0.2.0b2 or later**; one that uses
+  neither is also readable by 0.2.0b1. See the providers guide.
+- `Orchestrator.configured_providers(config)` returns the providers a default
+  run would build, without building the rest of the orchestrator.
+- A `suite-contract` CI job installs the suite from its main branch and checks
+  every inventory the command can write against the suite's schema and reader,
+  and this package's locality rule against the shared table.
+
 ### Fixed
 - **Reserved and limited-broadcast addresses are hosted, not local.**
   `240.0.0.0/4` (RFC 1112 reserved) and `255.255.255.255`, and their

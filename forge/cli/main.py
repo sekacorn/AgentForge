@@ -10,6 +10,8 @@ from __future__ import annotations
 import contextlib
 import json as jsonlib
 import sys
+from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -48,6 +50,8 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+#: Diagnostics go to stderr, so a document on stdout can be piped.
+err_console = Console(stderr=True)
 
 
 def _show_version(value: bool) -> None:
@@ -156,6 +160,56 @@ def audit() -> None:
     else:
         console.print("[bold red]audit log integrity check FAILED[/]")
         raise typer.Exit(code=1)
+
+
+providers_app = typer.Typer(help="Describe the model providers Forge is configured with.")
+app.add_typer(providers_app, name="providers")
+
+
+@providers_app.command("inventory")
+def providers_inventory(
+    declarations: Annotated[
+        Path,
+        typer.Option(
+            "--declarations",
+            help="A provider-declarations.v1 file: features in use, vendor-only features, "
+            "and optionally models, jurisdiction and fallback, per provider.",
+        ),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Write the inventory here instead of printing it."),
+    ] = None,
+    use_registry_models: Annotated[
+        bool,
+        typer.Option(
+            "--use-registry-models",
+            help="For a provider whose models are not declared, take them from the model "
+            "registry, marked as from registry, not confirmed in use. Without this flag such "
+            "a provider is refused.",
+        ),
+    ] = False,
+) -> None:
+    """Write a provider-inventory.v1 for the configured providers."""
+    from forge.models.inventory import build_inventory, load_declarations, render_inventory
+
+    try:
+        declared = load_declarations(declarations)
+        providers = Orchestrator.configured_providers(ForgeConfig.load())
+        result = build_inventory(providers, declared, use_registry_models=use_registry_models)
+    except ForgeError as exc:
+        err_console.print(f"[bold red]Error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
+    text = render_inventory(result)
+    for note in result.notes:
+        err_console.print(f"[yellow]note:[/] {note}")
+    if output is None:
+        # Plain stdout: the document must not pass through console markup.
+        sys.stdout.write(text)
+        return
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(text, encoding="utf-8", newline="\n")
+    err_console.print(f"provider inventory written to {output}")
 
 
 @app.command()

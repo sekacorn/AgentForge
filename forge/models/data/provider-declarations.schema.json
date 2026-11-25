@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sekacorn/agentforge-oss/schemas/provider-declarations.schema.json",
+  "title": "provider-declarations.v1",
+  "description": "What an operator states about each configured model provider, for `forge providers inventory`. Everything here is attested: features in use, vendor-only features and their reconstruction paths are never guessed by Forge. Rules a JSON Schema cannot express are enforced by the reader: a vendor-only feature or model listed twice, and a fallback provider_id that does not name another provider in the inventory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "providers"],
+  "properties": {
+    "schema_version": {"const": "provider-declarations.v1"},
+    "providers": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "propertyNames": {"pattern": "^[a-z0-9_]{1,64}$"},
+      "additionalProperties": {"$ref": "#/$defs/declaration"}
+    }
+  },
+  "$defs": {
+    "declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_calling", "streaming", "vendor_only"],
+      "properties": {
+        "tool_calling": {"type": "boolean", "description": "Whether the system uses tool calling with this provider."},
+        "streaming": {"type": "boolean", "description": "Whether the system streams responses from this provider."},
+        "vendor_only": {
+          "type": "array",
+          "maxItems": 16,
+          "description": "Features only this vendor offers that the system uses. An empty list states that there are none.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature", "reconstruction"],
+            "properties": {
+              "feature": {"type": "string", "pattern": "^[a-z0-9_]{1,64}$"},
+              "reconstruction": {"enum": ["documented", "none"]}
+            }
+          }
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "description": "Models in use. When omitted, the models Forge's registry lists for this provider are used, and the command says so.",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "jurisdiction": {
+          "type": "string",
+          "pattern": "^([A-Z]{2}|unknown)$",
+          "description": "Fills an unknown jurisdiction, or withholds a preset's with unknown. A value that contradicts the preset's is refused."
+        },
+        "fallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["available"],
+          "properties": {
+            "available": {"type": "boolean"},
+            "provider_id": {"type": "string", "pattern": "^[a-z0-9_]{1,64}$"}
+          },
+          "if": {"properties": {"available": {"const": false}}},
+          "then": {"not": {"required": ["provider_id"]}}
+        }
+      }
+    }
+  }
+}

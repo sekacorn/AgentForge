@@ -293,6 +293,19 @@ class Orchestrator:
             self._otel_exporter = None
         await self.aclose()
 
+    @classmethod
+    def configured_providers(cls, config: ForgeConfig) -> dict[str, ModelProvider]:
+        """The providers a default run would build from ``config``, and nothing else.
+
+        Uses the same decisions as :meth:`_build_default_providers`, without
+        building the router, sandbox or audit log. Nothing is contacted: no
+        provider makes a network call when it is constructed.
+        """
+        probe = cls.__new__(cls)
+        probe.config = config
+        probe._log = get_logger("orchestrator")
+        return probe._build_default_providers()
+
     def _build_default_providers(self) -> dict[str, ModelProvider]:
         """Always provide the offline echo provider; add Anthropic/OpenAI/Ollama.
 
