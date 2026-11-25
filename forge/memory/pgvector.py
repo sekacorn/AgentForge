@@ -24,7 +24,8 @@ import math
 import re
 from typing import Any
 
-from forge.memory.base import Memory, MemoryItem
+from forge.exceptions import MemoryDimensionError
+from forge.memory.base import Memory, MemoryItem, dimension_mismatch_message
 
 _ASYNCPG_MISSING = (
     "pgvector memory backend requires asyncpg and pgvector: pip install 'agentforge-oss[pgvector]'"
@@ -32,6 +33,7 @@ _ASYNCPG_MISSING = (
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 _SQL_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+_VECTOR_TYPE = re.compile(r"vector\((\d+)\)\Z")
 
 
 def _tokenize(text: str) -> list[str]:
@@ -102,6 +104,19 @@ class PGVectorMemoryStore(Memory):
                 f"CREATE INDEX IF NOT EXISTS {self._index_sql} "  # nosec B608
                 f"ON {self._table_sql} USING ivfflat (embedding vector_cosine_ops) "
                 f"WITH (lists = 100)"
+            )
+            # CREATE TABLE IF NOT EXISTS keeps an existing table's dimension;
+            # refuse a mismatch here instead of failing on every query later.
+            declared = await conn.fetchval(
+                "SELECT format_type(atttypid, atttypmod) FROM pg_attribute "
+                "WHERE attrelid = to_regclass($1) AND attname = 'embedding'",
+                self._table_sql,
+            )
+        match = _VECTOR_TYPE.fullmatch(declared) if isinstance(declared, str) else None
+        if match is not None and int(match.group(1)) != self._dim:
+            await self.aclose()
+            raise MemoryDimensionError(
+                dimension_mismatch_message("pgvector", int(match.group(1)), self._dim)
             )
         return self
 

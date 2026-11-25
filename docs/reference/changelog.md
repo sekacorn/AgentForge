@@ -8,6 +8,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Memory search no longer compares vectors of different dimensions.**
+  `SQLiteMemoryStore.search` paired the query vector with each stored vector
+  using `zip(..., strict=False)`, so a store built at one `embedding_dim` and
+  opened at another (the in-memory store defaults to 512, SQLite and pgvector to
+  64) truncated the longer vector and **returned wrong rankings with no
+  error**. **Affects `SQLiteMemoryStore` in every release from 0.3.0 through
+  0.5.7.** It now raises the new `MemoryDimensionError` (a
+  `MemoryBackendError`) when the store opens, before a vector of a second
+  dimension can be written, and again in `search` for a table that already
+  holds two. `PGVectorMemoryStore` (0.5.1 through 0.5.7) was not silent, since
+  PostgreSQL refused the query, but failed on every call with a database
+  error; it now checks the table's declared dimension on open and raises the
+  same clear error. The in-memory store builds every vector itself and
+  compares strictly, so it was not affected. The error names both dimensions
+  and never repeats stored text.
+
 ## [0.5.7] - 2026-11-25
 
 Adds `forge providers inventory`, which writes the `provider-inventory.v1`
