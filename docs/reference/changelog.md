@@ -8,6 +8,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-11-25
+
+Portable memory (Phase 4a). The bundled memory stores can now be exported as
+`agent-memory.v1`, imported back with every item quarantined until reviewed,
+and migrated in place. **Exports this version writes are scored by AI
+Infrastructure Suite 0.2.0b3 or later** (`memory_inventory`); `Memory` itself
+is unchanged, so third-party backends keep working. Opening an existing SQLite
+or pgvector store applies an additive migration (see Changed); run
+`forge memory migrate --print-sql` first if a DBA must apply it.
+
 ### Added
 - **`PortableMemory`** (`forge.memory.portable`), an optional interface the
   three bundled backends now implement: `list_records` (paged by ID),
