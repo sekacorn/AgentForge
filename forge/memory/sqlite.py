@@ -161,6 +161,21 @@ class SQLiteMemoryStore(Memory):
             return conn
 
     @staticmethod
+    def migration_sql() -> list[str]:
+        """The additive statements portability adds to an existing database.
+
+        Each ``ALTER TABLE`` runs only when its column is missing; the tables use
+        ``IF NOT EXISTS``. Nothing is dropped or renamed.
+        """
+        return [
+            *(
+                f"ALTER TABLE memories ADD COLUMN {column} {definition}"
+                for column, definition in _ADDED_COLUMNS
+            ),
+            *_CREATE_PORTABILITY_SQL,
+        ]
+
+    @staticmethod
     async def _migrate(conn: aiosqlite.Connection) -> None:
         cursor = await conn.execute("PRAGMA table_info(memories)")
         present = {row[1] for row in await cursor.fetchall()}

@@ -29,7 +29,7 @@ import re
 from collections.abc import Sequence
 from typing import Any, Literal
 
-from forge.exceptions import MemoryDimensionError
+from forge.exceptions import MemoryDimensionError, MemoryMigrationError
 from forge.memory.base import Memory, MemoryItem, dimension_mismatch_message
 from forge.memory.portable import (
     HASHED_BOW_REVISION,
@@ -138,34 +138,88 @@ class PGVectorMemoryStore(Memory):
                 "WHERE attrelid = to_regclass($1) AND attname = 'embedding'",
                 self._table_sql,
             )
-            await self._migrate(conn)
-        match = _VECTOR_TYPE.fullmatch(declared) if isinstance(declared, str) else None
-        if match is not None and int(match.group(1)) != self._dim:
+            match = _VECTOR_TYPE.fullmatch(declared) if isinstance(declared, str) else None
+            stored = int(match.group(1)) if match is not None else None
+            failure: MemoryMigrationError | None = None
+            # Refuse a dimension mismatch before touching the schema at all.
+            if stored is None or stored == self._dim:
+                try:
+                    await self._migrate(conn)
+                except MemoryMigrationError as exc:
+                    failure = exc
+        if stored is not None and stored != self._dim:
             await self.aclose()
-            raise MemoryDimensionError(
-                dimension_mismatch_message("pgvector", int(match.group(1)), self._dim)
-            )
+            raise MemoryDimensionError(dimension_mismatch_message("pgvector", stored, self._dim))
+        if failure is not None:
+            # Close the pool first; the error carries no database text.
+            await self.aclose()
+            raise failure
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
         await self.aclose()
 
-    async def _migrate(self, conn: Any) -> None:
-        """Additive schema for portability. Existing rows stay active and native."""
+    def migration_sql(self) -> list[str]:
+        """The additive statements that portability adds to an existing table.
+
+        Every statement is idempotent (``IF NOT EXISTS``) and nothing is dropped
+        or renamed. ``forge memory migrate --print-sql`` prints exactly these, so a
+        DBA can apply them by hand. Lock behaviour: ``ADD COLUMN`` with a NULL or
+        constant default is a catalog-only change that holds an ACCESS EXCLUSIVE
+        lock only briefly; the index is built ``CONCURRENTLY``, so writes continue
+        while it builds.
+        """
         # Identifiers are validated and quoted; everything else is fixed text.
-        for statement in (
+        return [
             f"ALTER TABLE {self._table_sql} ADD COLUMN IF NOT EXISTS item_id TEXT",
             f"ALTER TABLE {self._table_sql} "
             f"ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'",
             f"ALTER TABLE {self._table_sql} ADD COLUMN IF NOT EXISTS provenance JSONB",
-            f"CREATE UNIQUE INDEX IF NOT EXISTS {self._item_index_sql} "
-            f"ON {self._table_sql} (({_PORTABLE_ID}))",
             f"CREATE TABLE IF NOT EXISTS {self._tombstones_sql} ("
             f"item_id TEXT PRIMARY KEY, deleted_at TIMESTAMPTZ NOT NULL, reason TEXT NOT NULL)",
             f"CREATE TABLE IF NOT EXISTS {self._rejected_sql} ("
             f"item_id TEXT PRIMARY KEY, rejected_at TIMESTAMPTZ NOT NULL, reviewer TEXT NOT NULL)",
-        ):
-            await conn.execute(statement)  # nosec B608
+            f"CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS {self._item_index_sql} "
+            f"ON {self._table_sql} (({_PORTABLE_ID}))",
+        ]
+
+    def _migration_failed(self, sqlstate: object) -> MemoryMigrationError:
+        if sqlstate == "42501":  # insufficient_privilege
+            return MemoryMigrationError(
+                f"The database user may not change table {self._table} (it lacks ALTER or "
+                "CREATE privileges). Ask the table owner or a DBA to run "
+                "`forge memory migrate --print-sql` and apply the statements it prints, "
+                "then open the store again."
+            )
+        return MemoryMigrationError(
+            f"Migrating memory table {self._table} failed (SQLSTATE {sqlstate}). Run "
+            "`forge memory migrate --print-sql` to see the statements, which are idempotent "
+            "and additive, and apply them as the table owner."
+        )
+
+    async def _migrate(self, conn: Any) -> None:
+        """Additive schema for portability. Existing rows stay active and native."""
+        # A concurrent index build that was interrupted leaves an INVALID index,
+        # which IF NOT EXISTS would then skip forever without enforcing anything.
+        valid = await conn.fetchval(
+            "SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass($1)",
+            self._item_index_sql,
+        )
+        if valid is False:
+            raise MemoryMigrationError(
+                f"Index {self._table}_item_id_idx exists but is invalid (an interrupted "
+                f"concurrent build). Run DROP INDEX CONCURRENTLY {self._item_index_sql}; "
+                "then `forge memory migrate`."
+            )
+        for statement in self.migration_sql():
+            try:
+                # Outside any transaction, as CREATE INDEX CONCURRENTLY requires.
+                await conn.execute(statement)  # nosec B608
+            except Exception as exc:
+                sqlstate = getattr(exc, "sqlstate", None)
+                if sqlstate is None:
+                    raise
+                raise self._migration_failed(sqlstate) from None
 
     async def add(self, text: str, *, metadata: dict[str, object] | None = None) -> str:
         import json

@@ -26,16 +26,37 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   holding only its ID and time; an import never resurrects a tombstoned ID,
   and an item a reviewer rejected is never imported again. Tombstones survive
   `clear()`.
+- **`forge memory migrate`** applies the configured store's schema migration
+  deliberately; `--print-sql` prints the statements instead, for a DBA to
+  apply, and opens no connection. Opening a store runs the same migration
+  automatically. A migration that fails, for example because the database user
+  lacks ALTER or CREATE privileges, raises the new `MemoryMigrationError` (a
+  `MemoryBackendError`) saying what to run; it never surfaces a raw database
+  error, and its pool is closed.
 
 ### Changed
-- **Additive storage migrations, applied on open.** SQLite gains `status` and
-  `provenance` columns (existing rows read as active and native) and tables for
-  tombstones, rejected IDs and a `forge_memory_meta` record of the store's
-  scheme and dimension, so even an empty store refuses to reopen at another
-  dimension. pgvector gains a nullable `item_id` column for imported IDs, a
-  unique index on each row's portable ID (`COALESCE(item_id, id::text)`, so the
-  IDs `add` and `search` return are unchanged), `status`, `provenance`, and
-  tombstone and rejected tables. Nothing is dropped or renamed.
+- **Additive schema migrations, run when a store opens or by
+  `forge memory migrate`.** Every statement is idempotent; nothing is dropped,
+  renamed or rewritten, and existing rows read back as active and native.
+  - **pgvector**, on the existing table (default `forge_memories`; shown as
+    `<table>`):
+    - column `item_id TEXT` (nullable): the original ID of an imported row;
+    - column `status TEXT NOT NULL DEFAULT 'active'`;
+    - column `provenance JSONB` (nullable);
+    - unique index `<table>_item_id_idx` on `(COALESCE(item_id, id::text))`,
+      built `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS`, so the IDs `add`
+      and `search` return are unchanged;
+    - new tables `<table>_tombstones` and `<table>_rejected`.
+    **Locks:** each `ADD COLUMN` (NULL or constant default) is a catalog-only
+    change holding an `ACCESS EXCLUSIVE` lock briefly; the index builds
+    concurrently, so writes continue. An index left invalid by an interrupted
+    concurrent build is detected and reported (drop it and re-run), never
+    silently skipped. A dimension mismatch is refused before any schema change.
+  - **SQLite**, on the existing `memories` table: columns `status TEXT NOT NULL
+    DEFAULT 'active'` and `provenance TEXT`, each added only when missing; new
+    tables `memory_tombstones`, `memory_rejected` and `forge_memory_meta`. The
+    meta table records the store's scheme and dimension, so even an empty store
+    refuses to reopen at another dimension.
 
 ## [0.5.8] - 2026-11-25
 

@@ -7,6 +7,7 @@ configuration (offline echo provider) and automatically uses Claude when
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json as jsonlib
 import sys
@@ -210,6 +211,55 @@ def providers_inventory(
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(text, encoding="utf-8", newline="\n")
     err_console.print(f"provider inventory written to {output}")
+
+
+memory_app = typer.Typer(help="Inspect and migrate Forge memory stores.")
+app.add_typer(memory_app, name="memory")
+
+
+async def _open_and_close(store: object) -> None:
+    async with store:  # type: ignore[attr-defined]
+        pass
+
+
+@memory_app.command("migrate")
+def memory_migrate(
+    print_sql: Annotated[
+        bool,
+        typer.Option(
+            "--print-sql",
+            help="Print the additive statements instead of running them, for a DBA to apply.",
+        ),
+    ] = False,
+) -> None:
+    """Apply the configured memory store's additive schema migration.
+
+    Opening a SQLite or pgvector store runs the same migration automatically;
+    this command lets an operator run it deliberately, or print it.
+    """
+    from forge.memory import build_memory
+
+    try:
+        store = build_memory(ForgeConfig.load())
+    except ForgeError as exc:
+        err_console.print(f"[bold red]Error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
+    migration_sql = getattr(store, "migration_sql", None)
+    if migration_sql is None:
+        err_console.print("The configured memory store is in-memory; there is nothing to migrate.")
+        return
+    if print_sql:
+        # Plain stdout, so the statements can be piped to psql or sqlite3.
+        sys.stdout.write("".join(f"{statement};\n" for statement in migration_sql()))
+        return
+    try:
+        asyncio.run(_open_and_close(store))
+    except ForgeError as exc:
+        err_console.print(f"[bold red]Error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
+    err_console.print(
+        "Memory store schema is up to date (additive migration; nothing dropped or renamed)."
+    )
 
 
 @app.command()

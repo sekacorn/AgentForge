@@ -236,7 +236,23 @@ is stored apart from the item's own metadata.
 **Deletions stick.** `delete_record` leaves a tombstone holding only the ID and
 the time. No import resurrects a tombstoned ID.
 
-**Migrations.** Opening an existing SQLite or pgvector store adds the columns
-and tables above in place; nothing is dropped or renamed, and existing items
-are active.
+**Migrations.** Opening an existing SQLite or pgvector store runs an additive
+migration automatically: every statement is idempotent, nothing is dropped or
+renamed, and existing items are active. To run it deliberately, or to hand it
+to a DBA, use the CLI:
+
+```bash
+forge memory migrate              # apply it to the configured store
+forge memory migrate --print-sql  # print the statements; opens no connection
+```
+
+On pgvector it adds the columns `item_id`, `status` and `provenance`, the unique
+index `<table>_item_id_idx` (built `CONCURRENTLY`, so writes continue while it
+builds) and the tables `<table>_tombstones` and `<table>_rejected`. Each
+`ADD COLUMN` holds an `ACCESS EXCLUSIVE` lock only briefly. If the database user
+lacks ALTER or CREATE privileges, opening the store fails with
+`MemoryMigrationError` explaining what to run; have the table owner apply the
+`--print-sql` output. An index left invalid by an interrupted concurrent build
+is reported, never skipped: drop it with `DROP INDEX CONCURRENTLY` and run
+`forge memory migrate` again.
 
