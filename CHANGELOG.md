@@ -8,6 +8,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-11-26
+
+MCP tool connectors (Phase 4b), behind the optional `agentforge-oss[mcp]`
+extra; core AgentForge never imports the `mcp` SDK. Forge connects to MCP
+servers on the 2026-07-28 protocol and offers a model only the tools a person
+approved by definition hash (`forge mcp approve` shows a diff and never
+approves blind); it can serve its own tools under default-deny rules
+(`forge mcp serve`), wrap proprietary connectors (`ToolConnector`), and write a
+`tool-inventory.v1` in which every tool declares its backend
+(`forge tools inventory`). **Inventories this version writes are scored by AI
+Infrastructure Suite 0.2.0b4 or later** (`tool_inventory`). Also: duplicate
+tool registration is refused unless replacement is explicit, and CLI errors
+print as plain text. No change to existing behaviour for users who do not
+install the extra, apart from the `ToolRegistry` fix (see Fixed).
+
 ### Added
 - **`ToolConnector` adapter and `forge tools inventory`** (last 4b
   checkpoint).
