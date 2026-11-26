@@ -1,0 +1,24 @@
+# mcp-servers.v1: the MCP servers Forge may contact. A server not named here is
+# never contacted. Commit this file with tool-approvals.json and tool-definitions/.
+schema_version = "mcp-servers.v1"
+approvals = "tool-approvals.json"
+definitions = "tool-definitions"
+
+[[servers]]
+server_id = "files"
+transport = "streamable_http"
+url = "http://127.0.0.1:8765/mcp"
+
+[[servers]]
+server_id = "crm"
+transport = "streamable_http"
+url = "https://mcp.crm.example.com/v1"
+default_query = { "api-version" = "2026-07-28" }
+bearer_token_env = "CRM_MCP_TOKEN"
+
+[[servers]]
+server_id = "local-tools"
+transport = "stdio"
+command = "local-tools-mcp"
+args = ["--read-only"]
+env_allowlist = ["LOCAL_TOOLS_ROOT"]
