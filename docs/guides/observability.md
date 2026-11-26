@@ -41,6 +41,11 @@ same stream without producers knowing who is listening.
 | `POLICY_APPROVED` | An approver returned True |
 | `POLICY_DENIED` | A policy rule blocked a tool call |
 | `POLICY_LOGGED` | A log-action policy rule recorded a call |
+| `MCP_SERVER_CONNECTED` | An MCP connector connected (protocol, transport, origin, hosting) |
+| `MCP_SERVER_REFUSED` | An MCP server was refused (policy, protocol or connection failure; class name only) |
+| `MCP_TOOL_REFUSED` | An MCP tool is pending, invalid or returned, so it is not offered |
+| `MCP_TOOL_DEFINITION_CHANGED` | An approved MCP tool's definition changed; both hashes, never the text |
+| `MCP_RESULT_FLAGGED` | An MCP tool result matched an injection indicator (reasons only) |
 
 ### Subscribing
 

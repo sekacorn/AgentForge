@@ -53,6 +53,11 @@ class EventType(enum.StrEnum):
     POLICY_APPROVED = "policy.approved"
     POLICY_DENIED = "policy.denied"
     POLICY_LOGGED = "policy.logged"
+    MCP_SERVER_CONNECTED = "mcp.server.connected"
+    MCP_SERVER_REFUSED = "mcp.server.refused"
+    MCP_TOOL_REFUSED = "mcp.tool.refused"
+    MCP_TOOL_DEFINITION_CHANGED = "mcp.tool.definition_changed"
+    MCP_RESULT_FLAGGED = "mcp.result.flagged"
 
 
 EventHandler = Callable[["Event"], None]
