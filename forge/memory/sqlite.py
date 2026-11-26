@@ -24,11 +24,26 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
 from forge.exceptions import MemoryDimensionError
 from forge.memory.base import Memory, MemoryItem, dimension_mismatch_message
+from forge.memory.portable import (
+    HASHED_BOW_REVISION,
+    HASHED_BOW_SCHEME,
+    EmbeddingScheme,
+    ImportProvenance,
+    ImportReport,
+    ImportSource,
+    MemoryRecord,
+    RecordPage,
+    ReviewReport,
+    Tombstone,
+    classify_import,
+)
 from forge.memory.vector import _stable_bucket, _tokenize
 from forge.types import new_id, utcnow
 
@@ -48,6 +63,27 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at TEXT NOT NULL
 )
 """
+
+# Additive migrations for portability (agentforge-oss 0.5.9). Existing rows are
+# active and native: the defaults say exactly that. Nothing is dropped or renamed.
+_ADDED_COLUMNS = (
+    ("status", "TEXT NOT NULL DEFAULT 'active'"),
+    ("provenance", "TEXT"),
+)
+_CREATE_PORTABILITY_SQL = (
+    "CREATE TABLE IF NOT EXISTS memory_tombstones ("
+    "item_id TEXT PRIMARY KEY, deleted_at TEXT NOT NULL, reason TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS memory_rejected ("
+    "item_id TEXT PRIMARY KEY, rejected_at TEXT NOT NULL, reviewer TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS forge_memory_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+)
+#: ``created_at`` is NOT NULL in the original table; an imported item whose
+#: source never recorded a time is stored with this marker and read back as None.
+_UNKNOWN_TIME = ""
+
+
+def _time(value: str) -> datetime | None:
+    return None if value == _UNKNOWN_TIME else datetime.fromisoformat(value)
 
 
 class SQLiteMemoryStore(Memory):
@@ -97,6 +133,7 @@ class SQLiteMemoryStore(Memory):
                 raise ImportError(_AIOSQLITE_MISSING) from exc
             conn = await aiosqlite.connect(self._path)
             await conn.execute(_CREATE_TABLE_SQL)
+            await self._migrate(conn)
             await conn.commit()
             # A store built at another dimension is refused before it can be
             # searched or have vectors of a second dimension written into it.
@@ -110,8 +147,63 @@ class SQLiteMemoryStore(Memory):
                     raise MemoryDimensionError(
                         dimension_mismatch_message("SQLite", stored, self._dim)
                     )
+            # The store records the dimension it was built with, so even an
+            # empty store refuses to be reopened at another one.
+            recorded = await self._meta(conn, "dimensions")
+            if recorded is None:
+                await self._record_scheme(conn)
+            elif int(recorded) != self._dim:
+                await conn.close()
+                raise MemoryDimensionError(
+                    dimension_mismatch_message("SQLite", int(recorded), self._dim)
+                )
             self._conn = conn
             return conn
+
+    @staticmethod
+    def migration_sql() -> list[str]:
+        """The additive statements portability adds to an existing database.
+
+        Each ``ALTER TABLE`` runs only when its column is missing; the tables use
+        ``IF NOT EXISTS``. Nothing is dropped or renamed.
+        """
+        return [
+            *(
+                f"ALTER TABLE memories ADD COLUMN {column} {definition}"
+                for column, definition in _ADDED_COLUMNS
+            ),
+            *_CREATE_PORTABILITY_SQL,
+        ]
+
+    @staticmethod
+    async def _migrate(conn: aiosqlite.Connection) -> None:
+        cursor = await conn.execute("PRAGMA table_info(memories)")
+        present = {row[1] for row in await cursor.fetchall()}
+        await cursor.close()
+        for column, definition in _ADDED_COLUMNS:
+            if column not in present:
+                # Fixed names and definitions from this module, never input.
+                await conn.execute(f"ALTER TABLE memories ADD COLUMN {column} {definition}")  # nosec B608
+        for statement in _CREATE_PORTABILITY_SQL:
+            await conn.execute(statement)
+
+    @staticmethod
+    async def _meta(conn: aiosqlite.Connection, key: str) -> str | None:
+        cursor = await conn.execute("SELECT value FROM forge_memory_meta WHERE key = ?", (key,))
+        row = await cursor.fetchone()
+        await cursor.close()
+        return None if row is None else str(row[0])
+
+    async def _record_scheme(self, conn: aiosqlite.Connection) -> None:
+        for key, value in (
+            ("scheme_id", HASHED_BOW_SCHEME),
+            ("revision", HASHED_BOW_REVISION),
+            ("dimensions", str(self._dim)),
+        ):
+            await conn.execute(
+                "INSERT OR IGNORE INTO forge_memory_meta (key, value) VALUES (?, ?)", (key, value)
+            )
+        await conn.commit()
 
     async def add(self, text: str, *, metadata: dict[str, object] | None = None) -> str:
         conn = await self._ensure_conn()
@@ -132,7 +224,10 @@ class SQLiteMemoryStore(Memory):
         # Full table scan + in-Python cosine similarity. This is fine for the
         # modest stores this backend targets; for large corpora a native vector
         # extension (sqlite-vec) or an ANN index would scale retrieval far better.
-        cursor = await conn.execute("SELECT id, text, embedding, metadata FROM memories")
+        # Quarantined imports never reach a search.
+        cursor = await conn.execute(
+            "SELECT id, text, embedding, metadata FROM memories WHERE status = 'active'"
+        )
         rows = await cursor.fetchall()
         await cursor.close()
 
@@ -163,3 +258,140 @@ class SQLiteMemoryStore(Memory):
         if self._conn is not None:
             await self._conn.close()
             self._conn = None
+
+    # --- PortableMemory ------------------------------------------------------------
+
+    @property
+    def embedding_scheme(self) -> EmbeddingScheme:
+        return EmbeddingScheme(
+            scheme_id=HASHED_BOW_SCHEME, revision=HASHED_BOW_REVISION, dimensions=self._dim
+        )
+
+    async def list_records(self, *, after: str | None = None, limit: int = 1000) -> RecordPage:
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+        conn = await self._ensure_conn()
+        cursor = await conn.execute(
+            "SELECT id, text, metadata, created_at, status, provenance FROM memories "
+            "WHERE (? IS NULL OR id > ?) ORDER BY id LIMIT ?",
+            (after, after, limit + 1),
+        )
+        rows = list(await cursor.fetchall())
+        await cursor.close()
+        records = [
+            MemoryRecord(
+                item_id=row[0],
+                text=row[1],
+                metadata=json.loads(row[2]) if row[2] else {},
+                created_at=_time(row[3]),
+                status=row[4],
+                provenance=None if row[5] is None else ImportProvenance.model_validate_json(row[5]),
+            )
+            for row in rows[:limit]
+        ]
+        more = len(rows) > limit
+        return RecordPage(records=records, next_after=records[-1].item_id if more else None)
+
+    async def list_tombstones(self) -> list[Tombstone]:
+        conn = await self._ensure_conn()
+        cursor = await conn.execute(
+            "SELECT item_id, deleted_at FROM memory_tombstones ORDER BY item_id"
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [
+            Tombstone(item_id=row[0], deleted_at=datetime.fromisoformat(row[1])) for row in rows
+        ]
+
+    async def _exists(self, conn: aiosqlite.Connection, table: str, item_id: str) -> bool:
+        # ``table`` is one of this module's fixed table names, never input.
+        cursor = await conn.execute(f"SELECT 1 FROM {table} WHERE item_id = ?", (item_id,))  # nosec B608
+        row = await cursor.fetchone()
+        await cursor.close()
+        return row is not None
+
+    async def import_records(
+        self, records: Sequence[MemoryRecord], *, source: ImportSource
+    ) -> ImportReport:
+        conn = await self._ensure_conn()
+        report = ImportReport(received=len(records))
+        for record in records:
+            cursor = await conn.execute(
+                "SELECT text, metadata FROM memories WHERE id = ?", (record.item_id,)
+            )
+            row = await cursor.fetchone()
+            await cursor.close()
+            existing: tuple[str, dict[str, Any]] | None = (
+                None if row is None else (row[0], json.loads(row[1]) if row[1] else {})
+            )
+            outcome = classify_import(
+                record,
+                existing=existing,
+                tombstoned=await self._exists(conn, "memory_tombstones", record.item_id),
+                rejected=await self._exists(conn, "memory_rejected", record.item_id),
+            )
+            if outcome == "unchanged":
+                report.unchanged += 1
+                continue
+            if outcome != "imported":
+                report.refused[record.item_id] = outcome
+                continue
+            created = _UNKNOWN_TIME if record.created_at is None else record.created_at.isoformat()
+            await conn.execute(
+                "INSERT INTO memories (id, text, embedding, metadata, created_at, status, "
+                "provenance) VALUES (?, ?, ?, ?, ?, 'quarantined', ?)",
+                (
+                    record.item_id,
+                    record.text,
+                    json.dumps(self._embed(record.text)),
+                    json.dumps(record.metadata),
+                    created,
+                    source.for_record(record.item_id).model_dump_json(),
+                ),
+            )
+            report.imported += 1
+        await conn.commit()
+        return report
+
+    async def delete_record(self, item_id: str, *, reason: str) -> Tombstone:
+        conn = await self._ensure_conn()
+        cursor = await conn.execute(
+            "SELECT deleted_at FROM memory_tombstones WHERE item_id = ?", (item_id,)
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        if row is not None:
+            return Tombstone(item_id=item_id, deleted_at=datetime.fromisoformat(row[0]))
+        tombstone = Tombstone(item_id=item_id, deleted_at=utcnow())
+        await conn.execute("DELETE FROM memories WHERE id = ?", (item_id,))
+        await conn.execute(
+            "INSERT INTO memory_tombstones (item_id, deleted_at, reason) VALUES (?, ?, ?)",
+            (item_id, tombstone.deleted_at.isoformat(), reason),
+        )
+        await conn.commit()
+        return tombstone
+
+    async def review_records(
+        self, item_ids: Sequence[str], *, decision: Literal["activate", "reject"], reviewer: str
+    ) -> ReviewReport:
+        conn = await self._ensure_conn()
+        report = ReviewReport()
+        for item_id in item_ids:
+            cursor = await conn.execute("SELECT status FROM memories WHERE id = ?", (item_id,))
+            row = await cursor.fetchone()
+            await cursor.close()
+            if row is None or row[0] != "quarantined":
+                report.not_quarantined.append(item_id)
+            elif decision == "activate":
+                await conn.execute("UPDATE memories SET status = 'active' WHERE id = ?", (item_id,))
+                report.activated.append(item_id)
+            else:
+                await conn.execute("DELETE FROM memories WHERE id = ?", (item_id,))
+                await conn.execute(
+                    "INSERT OR IGNORE INTO memory_rejected (item_id, rejected_at, reviewer) "
+                    "VALUES (?, ?, ?)",
+                    (item_id, utcnow().isoformat(), reviewer),
+                )
+                report.rejected.append(item_id)
+        await conn.commit()
+        return report

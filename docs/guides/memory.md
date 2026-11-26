@@ -204,3 +204,55 @@ config = ForgeConfig(
     pgvector_dsn="postgresql://forge@localhost:5432/forge",  # password from PGPASSWORD
 )
 ```
+
+---
+
+## Portable memory
+
+The bundled stores (`InMemoryVectorStore`, `SQLiteMemoryStore`,
+`PGVectorMemoryStore`) implement `forge.memory.PortableMemory`, so their
+contents can leave and arrive intact. A third-party `Memory` that does not is
+still usable; it is just not exportable.
+
+```python
+from forge.memory import ImportSource, MemoryRecord, PortableMemory
+
+assert isinstance(store, PortableMemory)
+page = await store.list_records(limit=1000)  # ordered by item_id; follow page.next_after
+report = await store.import_records(records, source=source)
+await store.review_records(["imp-1"], decision="activate", reviewer="alice")
+await store.delete_record("mem_123", reason="erasure request")
+```
+
+**Imported memory is untrusted.** Imported items keep their IDs and arrive
+`quarantined`: they are listed and exported with that status, but `search`
+never returns them until a reviewer activates them. Rejecting an item removes
+it and stops it from being imported again. An item with the same ID and
+different content is refused rather than overwritten, and an import carrying
+`_forge_*` metadata keys is refused, so a document cannot forge provenance.
+Provenance (where the item came from, which export, when, by which importer)
+is stored apart from the item's own metadata.
+
+**Deletions stick.** `delete_record` leaves a tombstone holding only the ID and
+the time. No import resurrects a tombstoned ID.
+
+**Migrations.** Opening an existing SQLite or pgvector store runs an additive
+migration automatically: every statement is idempotent, nothing is dropped or
+renamed, and existing items are active. To run it deliberately, or to hand it
+to a DBA, use the CLI:
+
+```bash
+forge memory migrate              # apply it to the configured store
+forge memory migrate --print-sql  # print the statements; opens no connection
+```
+
+On pgvector it adds the columns `item_id`, `status` and `provenance`, the unique
+index `<table>_item_id_idx` (built `CONCURRENTLY`, so writes continue while it
+builds) and the tables `<table>_tombstones` and `<table>_rejected`. Each
+`ADD COLUMN` holds an `ACCESS EXCLUSIVE` lock only briefly. If the database user
+lacks ALTER or CREATE privileges, opening the store fails with
+`MemoryMigrationError` explaining what to run; have the table owner apply the
+`--print-sql` output. An index left invalid by an interrupted concurrent build
+is reported, never skipped: drop it with `DROP INDEX CONCURRENTLY` and run
+`forge memory migrate` again.
+

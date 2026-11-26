@@ -7,6 +7,17 @@ from typing import TYPE_CHECKING
 from forge.memory.base import Memory, MemoryItem
 from forge.memory.conversation import ConversationMemory
 from forge.memory.pgvector import PGVectorMemoryStore
+from forge.memory.portable import (
+    EmbeddingScheme,
+    ImportProvenance,
+    ImportReport,
+    ImportSource,
+    MemoryRecord,
+    PortableMemory,
+    RecordPage,
+    ReviewReport,
+    Tombstone,
+)
 from forge.memory.sqlite import SQLiteMemoryStore
 from forge.memory.vector import InMemoryVectorStore
 
@@ -17,6 +28,15 @@ __all__ = [
     "Memory",
     "MemoryItem",
     "ConversationMemory",
+    "EmbeddingScheme",
+    "ImportProvenance",
+    "ImportReport",
+    "ImportSource",
+    "MemoryRecord",
+    "PortableMemory",
+    "RecordPage",
+    "ReviewReport",
+    "Tombstone",
     "InMemoryVectorStore",
     "PGVectorMemoryStore",
     "SQLiteMemoryStore",

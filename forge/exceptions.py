@@ -110,6 +110,14 @@ class MemoryBackendError(ForgeError):
     """A memory/RAG backend failed."""
 
 
+class MemoryMigrationError(MemoryBackendError):
+    """A store's additive schema migration could not be applied.
+
+    The message says what to run instead; it never repeats a raw database error
+    or a connection string.
+    """
+
+
 class MemoryDimensionError(MemoryBackendError):
     """A store's vectors and the configured embedding dimension disagree.
 
