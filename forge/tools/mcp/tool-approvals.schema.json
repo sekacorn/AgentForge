@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sekacorn/agentforge/schemas/tool-approvals.schema.json",
+  "title": "tool-approvals.v1",
+  "description": "MCP tool definitions a person has approved. A tool is approved only when its server, the server's origin, its name and its current definition hash all match an entry. The definition hash is the SHA-256 of the RFC 8785 canonical JSON of {server_id, name, description, inputSchema, outputSchema, annotations}. Uniqueness of (server_id, tool_name) is enforced by the reader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "approvals"],
+  "properties": {
+    "schema_version": { "const": "tool-approvals.v1" },
+    "approvals": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "server_id",
+          "server_origin",
+          "tool_name",
+          "definition_sha256",
+          "approved_by",
+          "approved_at",
+          "accepted_flags"
+        ],
+        "properties": {
+          "server_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$" },
+          "server_origin": {
+            "description": "scheme://host[:port] for an HTTP server; null for stdio and in-process servers. Never a path, query, fragment or credentials.",
+            "oneOf": [
+              { "type": "string", "maxLength": 256, "pattern": "^https?://[^/?#@\\s]+$" },
+              { "type": "null" }
+            ]
+          },
+          "tool_name": { "type": "string", "pattern": "^[A-Za-z0-9_./-]{1,128}$" },
+          "definition_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "approved_by": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" },
+          "approved_at": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+          },
+          "accepted_flags": {
+            "description": "Screening reasons the approver accepted for a flagged definition. Empty when nothing was flagged.",
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z0-9_]{1,64}$" }
+          }
+        }
+      }
+    }
+  }
+}

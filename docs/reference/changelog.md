@@ -8,6 +8,73 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **MCP tool connectors (Phase 4b, client side).** Install `agentforge-oss[mcp]`,
+  which adds the optional extra `mcp>=2.3,<3` (MIT). Core AgentForge never imports
+  `mcp`, and a test enforces it both statically and in a fresh interpreter.
+  - `forge.tools.mcp.McpConnector` connects to one configured server over
+    Streamable HTTP, stdio or in-process, using the **2026-07-28** protocol
+    (`server/discover`). It refuses a server that offers only the older
+    `initialize` handshake.
+  - It lists and hashes every tool and offers only approved ones, as `McpTool`
+    (`dangerous=True`, named `<server_id>__<tool>`). `refresh()` re-hashes and
+    `watch()` follows `subscriptions/listen`; neither ever approves anything.
+- **Rug-pull defense.**
+  - The definition hash is SHA-256 over the RFC 8785 canonical JSON of
+    `{server_id, name, description, inputSchema, outputSchema, annotations}`.
+    The canonical JSON is a standard-library implementation, checked against
+    the RFC's examples.
+  - Approvals are kept in a new **`tool-approvals.v1`** file, with a JSON
+    Schema (`forge/tools/mcp/tool-approvals.schema.json`), a strict bounded
+    reader, and fixtures in `docs/examples/mcp/`.
+  - Each tool is classified as `approved`, `pending`, `changed`, `returned` or
+    `invalid`. Only `approved` tools are offered.
+  - A changed definition is refused and emits `mcp.tool.definition_changed`
+    with both hashes and never the description. The same record is audited as
+    `agentforge.mcp.tool_definition_changed`.
+  - `connector.approve()` screens the description and schema first. A flagged
+    definition needs `accept_flagged=True`, and the accepted reasons are kept
+    in the approval.
+- **Untrusted content.**
+  - Descriptions are capped at 1 KiB, with control and bidirectional-override
+    characters stripped.
+  - Schemas are bounded: 64 KiB, depth 16, 128 properties, no remote `$ref`,
+    no `$id`.
+  - Arguments are validated against the approved schema before sending.
+  - Results are stripped, capped, screened (`mcp.result.flagged`) and framed as
+    untrusted data.
+  - A server's error text never reaches a prompt, event, log or audit record;
+    only the error class does.
+  - Three SDK behaviours are turned off:
+    - the client cache;
+    - the automatic re-list-and-resend on `HEADER_MISMATCH`, which now
+      re-hashes and refuses instead;
+    - every server-to-client feature (sampling, roots, elicitation, logging).
+- **Policy hooks.** `connect_policy` and `call_policy` receive
+  AgentPolicyPack-shaped `mcp.server.connect` and `tool.call` requests. The
+  `tool.call` request carries `tool.namespace = "mcp.<server_id>"` and
+  `tool.definition_sha256`. A denied connect never contacts the server.
+- **OAuth: `forge.tools.mcp.ForgeOAuthProvider`** is the SDK provider
+  (RFC 9728, RFC 8707, PKCE) with three Forge rules:
+  - `iss` is **always required** on the authorization response, and is
+    refused before the code is redeemed if missing.
+  - Client ID Metadata Documents **only**: no fallback to dynamic client
+    registration, no registration request ever sent, and a stored non-CIMD
+    registration is refused.
+  - The SDK's trailing-slash equivalence for root issuers in metadata is
+    documented.
+- `McpServerConfig` applies the endpoint URL rule (no credentials, query or
+  fragment; `default_query` redacted), records the origin only, and derives
+  hosting from it. stdio servers get an environment allowlist, and bearer
+  tokens are referenced by environment variable name.
+- New events `mcp.server.connected`, `mcp.server.refused`, `mcp.tool.refused`,
+  `mcp.tool.definition_changed` and `mcp.result.flagged`. New exceptions
+  `McpError` (a `ToolError`) and `McpAuthError`. New guide
+  `docs/guides/mcp.md`.
+- `ToolResult.untrusted` (default `False`) and `Tool.untrusted_results`
+  (default `False`): the sandbox marks results from untrusted tools, such as
+  MCP tools. Both are additive.
+
 ### Fixed
 - **`ToolRegistry.register` no longer replaces a same-named tool silently.
   Affects every published version through 0.5.9.** Registering a second tool

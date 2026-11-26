@@ -1,0 +1,16 @@
+{
+  "schema_version": "tool-approvals.v1",
+  "approvals": [
+    {
+      "server_id": "local-tools",
+      "server_origin": null,
+      "tool_name": "search",
+      "definition_sha256": "0fd51c430bff67af9f809eb8d94565f0db9b3a2dc283b09c8120d2baeec31a35",
+      "approved_by": "Security review (ticket SEC-142)",
+      "approved_at": "2026-11-26T10:30:00Z",
+      "accepted_flags": [
+        "override_instructions"
+      ]
+    }
+  ]
+}

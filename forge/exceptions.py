@@ -70,6 +70,18 @@ class DuplicateToolError(ToolError):
     """A tool with this name is already registered and replacement was not requested."""
 
 
+class McpError(ToolError):
+    """An MCP server or tool was refused, or a call to one failed.
+
+    Messages name the server and tool and the reason Forge refused; they never
+    repeat text the server sent, which is untrusted.
+    """
+
+
+class McpAuthError(McpError):
+    """Authorization with an MCP server was refused by Forge's OAuth rules."""
+
+
 class ToolValidationError(ToolError):
     """Tool arguments failed validation against the tool's schema."""
 

@@ -1,0 +1,23 @@
+{
+  "schema_version": "tool-approvals.v1",
+  "approvals": [
+    {
+      "server_id": "files",
+      "server_origin": "http://127.0.0.1:8765",
+      "tool_name": "count",
+      "definition_sha256": "af9c373da6577b859d5aee5656111d3ebb0a3139053f576fec5dedd04302417d",
+      "approved_by": "alice",
+      "approved_at": "2026-11-26T09:00:00Z",
+      "accepted_flags": []
+    },
+    {
+      "server_id": "files",
+      "server_origin": "http://127.0.0.1:8765",
+      "tool_name": "search",
+      "definition_sha256": "0fd51c430bff67af9f809eb8d94565f0db9b3a2dc283b09c8120d2baeec31a35",
+      "approved_by": "alice",
+      "approved_at": "2026-11-26T09:00:00Z",
+      "accepted_flags": []
+    }
+  ]
+}

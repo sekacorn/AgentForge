@@ -142,7 +142,13 @@ class ToolSandbox:
             )
 
         self._emit(EventType.TOOL_CALL_FINISHED, run_id, agent, tool=tool.name)
-        return ToolResult(tool_call_id=call.id, name=call.name, content=content, is_error=False)
+        return ToolResult(
+            tool_call_id=call.id,
+            name=call.name,
+            content=content,
+            is_error=False,
+            untrusted=tool.untrusted_results,
+        )
 
     def _emit(
         self, event_type: EventType, run_id: str | None, agent: str | None, **data: object

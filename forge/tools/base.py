@@ -106,6 +106,9 @@ def _summary(docstring: str | None) -> str:
 class Tool:
     """A callable exposed to agents, with an auto-generated schema."""
 
+    #: Results from this tool come from outside Forge (see :attr:`ToolResult.untrusted`).
+    untrusted_results: bool = False
+
     def __init__(
         self,
         func: Callable[..., Any],

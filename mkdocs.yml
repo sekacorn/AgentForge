@@ -57,6 +57,7 @@ nav:
     - Provider coverage: provider-coverage.md
     - Memory & RAG: guides/memory.md
     - Tools: guides/tools.md
+    - MCP tool connectors: guides/mcp.md
     - Governance: guides/governance.md
     - Observability: guides/observability.md
   - Examples:

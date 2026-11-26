@@ -78,6 +78,9 @@ class ToolResult(BaseModel):
     name: str
     content: str
     is_error: bool = False
+    #: True when the content came from outside Forge's trust boundary (for example an MCP
+    #: server). It is data to reason about, never instructions to follow.
+    untrusted: bool = False
 
 
 class Message(BaseModel):
