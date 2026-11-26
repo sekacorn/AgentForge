@@ -192,6 +192,33 @@ Neither ever approves anything.
 - **Leak through errors.** A server's error text never reaches a prompt,
   event, log or audit record; only the error class does.
 
+## Serving Forge's tools over MCP
+
+`forge mcp serve` (or `forge.tools.mcp.serve.McpToolServer`) exposes named
+tools as an MCP server. The rules are enforced when the server is built,
+before anything listens:
+
+| Rule | What happens |
+|---|---|
+| **Off by default** | Nothing in Forge starts a server. You run `forge mcp serve` or build a server yourself. |
+| **Only named tools** | Only tools given with `--expose` are listed or callable. There is no "all". With none named, the server refuses to start. |
+| **Dangerous tools never by default** | A `dangerous=True` tool (`http_get`, sandboxed execution, any MCP tool Forge consumes) also needs `--allow-dangerous NAME`. Listing it is not enough. |
+| **stdio or loopback only** | stdio is the default. HTTP binds to loopback unless `--allow-non-loopback` is given. |
+| **HTTP needs authorization** | A bearer token from `--bearer-token-env NAME`, or an OAuth `token_verifier` in Python. Without one, the server refuses to start. OAuth tokens must be issued for this server's resource URL (RFC 8707). |
+| **Every call is audited** | Including refused and unauthenticated ones, as `agentforge.mcp.server_call`: the caller (`stdio`, `bearer`, or `oauth:<client_id>`), tool, outcome and duration; arguments with credentials and PII redacted and capped; any injection indicators found; and the result's SHA-256 and length, never its content. |
+| **Caller input is untrusted** | Arguments are size-bounded, stripped of control characters, validated against the tool's schema and screened, then run under the sandbox policy and timeout. A failure reaches the caller as its exception class only. |
+
+```bash
+forge mcp serve --expose calculator --expose utc_now                 # stdio
+FORGE_SERVE_TOKEN=... forge mcp serve --http --expose calculator \
+    --bearer-token-env FORGE_SERVE_TOKEN                             # http://127.0.0.1:8765/mcp
+```
+
+In stdio mode stdout carries the MCP stream, so the command prints only to
+stderr. `forge mcp serve` serves Forge's built-in tools; to serve your own
+`ToolRegistry`, build an `McpToolServer` in Python and call `run_stdio()` or
+`run_http()`.
+
 ## Policy
 
 `McpConnector(connect_policy=..., call_policy=...)` take async callables that
