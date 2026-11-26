@@ -20,6 +20,7 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from forge import __version__
 from forge.cli.console import make_event_renderer, make_token_renderer
@@ -108,7 +109,7 @@ def run(
     try:
         result = orchestrator.run_sync(goal, mode=mode, model=model, stream=stream)
     except ForgeError as exc:
-        console.print(f"[bold red]Error:[/] {exc}")
+        console.print(_error_text(exc))
         raise typer.Exit(code=1) from exc
 
     if json_output:
@@ -201,7 +202,7 @@ def providers_inventory(
         providers = Orchestrator.configured_providers(ForgeConfig.load())
         result = build_inventory(providers, declared, use_registry_models=use_registry_models)
     except ForgeError as exc:
-        err_console.print(f"[bold red]Error:[/] {exc}")
+        err_console.print(_error_text(exc))
         raise typer.Exit(code=2) from exc
     text = render_inventory(result)
     for note in result.notes:
@@ -244,7 +245,7 @@ def memory_migrate(
     try:
         store = build_memory(ForgeConfig.load())
     except ForgeError as exc:
-        err_console.print(f"[bold red]Error:[/] {exc}")
+        err_console.print(_error_text(exc))
         raise typer.Exit(code=2) from exc
     migration_sql = getattr(store, "migration_sql", None)
     if migration_sql is None:
@@ -257,7 +258,7 @@ def memory_migrate(
     try:
         asyncio.run(_open_and_close(store))
     except ForgeError as exc:
-        err_console.print(f"[bold red]Error:[/] {exc}")
+        err_console.print(_error_text(exc))
         raise typer.Exit(code=2) from exc
     err_console.print(
         "Memory store schema is up to date (additive migration; nothing dropped or renamed)."
@@ -283,8 +284,19 @@ async def _with_store(store: Any, action: Callable[[Any], Awaitable[Any]]) -> An
     return await action(store)
 
 
+def _error_text(exc: BaseException) -> Text:
+    """``Error: <message>`` with the message as plain text.
+
+    Error messages carry text Forge does not control (names, paths, values from
+    a file or a server). Interpolating them into a Rich markup string would let
+    ``[...]`` be read as markup: swallowed, restyled, or an error of its own.
+    ``Text`` never parses markup, so the message prints exactly as it is.
+    """
+    return Text.assemble(("Error:", "bold red"), " ", str(exc))
+
+
 def _fail(exc: Exception) -> NoReturn:
-    err_console.print(f"[bold red]Error:[/] {exc}")
+    err_console.print(_error_text(exc))
     raise typer.Exit(code=2) from exc
 
 
