@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Contract tests for `tool-inventory.v1`.** Ahead of `forge tools
+  inventory`, a contract module pins three things against the suite:
+  - the names, origins and definition hashes a connector records fit the
+    suite's inventory reader;
+  - `backend` is required on every tool;
+  - a tool with a vendor-only backend scores 75 or 100, never 25, even when
+    approved and local.
 - **`suite-contract` covers the MCP formats.** `tool-approvals.v1`,
   `mcp-servers.v1` and `tool-definition.v1` are now owned by the AI
   Infrastructure Suite. A new contract module checks four things:
