@@ -9,6 +9,30 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`ToolConnector` adapter and `forge tools inventory`** (last 4b
+  checkpoint).
+  - `forge.tools.mcp.adapter.mount()` puts a proprietary connector (`backend`,
+    `describe()`, `call()`) behind an in-process MCP server. Its tools then get
+    the same hashing, approval and handling as any MCP tool.
+  - `forge tools inventory` writes `tool-inventory.v1` for the suite's
+    `tool_connectors` vector. It lists every approved tool, and skipped tools
+    are listed on stderr.
+  - **Every row carries `backend`.** It comes from `mcp-servers.toml`, where
+    each server must declare `backend` (`"self-contained"` or the service it
+    depends on), with optional per-tool `tool_backends` overrides. An adapter
+    takes it from the connector.
+  - **An adapter tool is never written with `backend: null`.** `mount` refuses
+    a connector without a real backend, and the writer refuses again.
+  - The inventory is checked against the suite's rules before it is written.
+  - A contract test feeds the writer's output to the suite's reader and
+    scoring.
+- **MCP policy requests match AgentPolicyPack's request model.**
+  - `mcp.server.connect` carries `resource: {id, type: McpServer, attributes:
+    {transport, origin, hosting}}`.
+  - `tool.call` carries `resource: {id: <server>/<tool>, type: McpTool,
+    attributes}`, the `tool` block, and the arguments under `context`.
+  - A bundle can therefore target hosted servers or one server's tools with no
+    AgentPolicyPack change. See its `examples/mcp_governance/`.
 - **`forge mcp serve` / `McpToolServer`: Forge tools as an MCP server
   (checkpoint 9b).** The owner's exposure rules are enforced before anything
   listens:

@@ -1,5 +1,9 @@
 # mcp-servers.v1: the MCP servers Forge may contact. A server not named here is
 # never contacted. Commit this file with tool-approvals.json and tool-definitions/.
+#
+# Every server declares backend: "self-contained" when its tools depend on no
+# external service, or the service they depend on. A vendor-only backend scores
+# the tool 75 or 100 in the AI Infrastructure Suite, whatever the MCP interface.
 schema_version = "mcp-servers.v1"
 approvals = "tool-approvals.json"
 definitions = "tool-definitions"
@@ -8,6 +12,7 @@ definitions = "tool-definitions"
 server_id = "files"
 transport = "streamable_http"
 url = "http://127.0.0.1:8765/mcp"
+backend = "self-contained"
 
 [[servers]]
 server_id = "crm"
@@ -15,6 +20,8 @@ transport = "streamable_http"
 url = "https://mcp.crm.example.com/v1"
 default_query = { "api-version" = "2026-07-28" }
 bearer_token_env = "CRM_MCP_TOKEN"
+# A third-party MCP server in front of a vendor's API.
+backend = { system = "crm-vendor-api", portability = "vendor_only", reconstruction = "documented" }
 
 [[servers]]
 server_id = "local-tools"
@@ -22,3 +29,6 @@ transport = "stdio"
 command = "local-tools-mcp"
 args = ["--read-only"]
 env_allowlist = ["LOCAL_TOOLS_ROOT"]
+backend = "self-contained"
+# One tool calls out to a hosted geocoding service with no portable replacement.
+tool_backends = { "geo/lookup" = { system = "geocoder-saas", portability = "vendor_only", reconstruction = "none" } }

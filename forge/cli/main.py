@@ -510,14 +510,12 @@ def memory_review(
         )
 
 
-@app.command(
-    "mcp",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-    add_help_option=False,
-)
-def mcp(ctx: typer.Context) -> None:
-    """Review and approve MCP tool definitions (needs agentforge-oss[mcp])."""
-    # Loaded only when this command runs, so core Forge never imports the MCP SDK.
+def _run_mcp_app(ctx: typer.Context, attribute: str, prog_name: str) -> None:
+    """Run a command group that lives in forge.tools.mcp, loading it only now.
+
+    Core Forge never imports the MCP SDK, so these groups are imported when one
+    of their commands runs, with the install hint when the extra is missing.
+    """
     try:
         module = importlib.import_module("forge.tools.mcp.cli")
     except ImportError as exc:
@@ -533,7 +531,27 @@ def mcp(ctx: typer.Context) -> None:
             )
             raise typer.Exit(code=2) from exc
         raise
-    module.app(args=list(ctx.args), prog_name="forge mcp")
+    getattr(module, attribute)(args=list(ctx.args), prog_name=prog_name)
+
+
+@app.command(
+    "mcp",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def mcp(ctx: typer.Context) -> None:
+    """Review, approve and serve MCP tools (needs agentforge-oss[mcp])."""
+    _run_mcp_app(ctx, "app", "forge mcp")
+
+
+@app.command(
+    "tools",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def tools(ctx: typer.Context) -> None:
+    """Describe the tool connectors Forge uses (needs agentforge-oss[mcp])."""
+    _run_mcp_app(ctx, "tools_app", "forge tools")
 
 
 @app.command()

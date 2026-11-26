@@ -192,6 +192,88 @@ Neither ever approves anything.
 - **Leak through errors.** A server's error text never reaches a prompt,
   event, log or audit record; only the error class does.
 
+## Declaring backends
+
+Every server in `mcp-servers.toml` declares what its tools depend on:
+
+```toml
+[[servers]]
+server_id = "files"
+transport = "streamable_http"
+url = "http://127.0.0.1:8765/mcp"
+backend = "self-contained"          # depends on no external service
+
+[[servers]]
+server_id = "crm"
+transport = "streamable_http"
+url = "https://mcp.crm.example.com/v1"
+# A third-party MCP server in front of a vendor's API.
+backend = { system = "crm-vendor-api", portability = "vendor_only", reconstruction = "documented" }
+tool_backends = { "export" = { system = "crm-vendor-api", portability = "vendor_only", reconstruction = "none" } }
+```
+
+`tool_backends` overrides the server's backend for individual tools. In the AI
+Infrastructure Suite, a tool with a vendor-only backend scores 75
+(`documented`) or 100 (`none`) for lock-in, **whatever its MCP interface,
+approval or hosting**: wrapping a vendor API in MCP does not make it portable.
+
+## Wrapping a proprietary connector (`ToolConnector`)
+
+A connector to a system with no MCP server implements `backend`, `describe()`
+and `call()`. `mount()` puts it behind an in-process MCP server, so its tools
+get the same hashing, approval, bounds and result handling as any MCP tool:
+
+```python
+from forge.tools.mcp import ToolApprovals
+from forge.tools.mcp.adapter import ToolDescription, mount
+from forge.tools.mcp.backend import Backend
+
+
+class CrmConnector:
+    backend = Backend(
+        system="crm-vendor-api", portability="vendor_only", reconstruction="documented"
+    )
+
+    def describe(self) -> list[ToolDescription]:
+        return [ToolDescription("lookup", "Look up a customer.", {"type": "object"})]
+
+    async def call(self, name: str, arguments: dict) -> dict: ...
+
+
+async with mount(CrmConnector(), "crm", ToolApprovals.load(path)) as connector:
+    tools = connector.tools()  # approved tools only, as crm__lookup
+```
+
+**An adapter always names its backend.** `mount` refuses a connector whose
+`backend` is missing or `"self-contained"`, and the inventory writer refuses an
+adapter tool without one.
+
+## The tool inventory
+
+```bash
+forge tools inventory --output tool-inventory.json
+```
+
+This writes a `tool-inventory.v1` document for the `tool_connectors` lock-in
+vector of the AI Infrastructure Suite:
+- It lists every **approved** tool of each configured server, each with the
+  backend its server declares. Tools that are not approved are not callable,
+  so they are left out and listed on stderr.
+- A server with no declared backend stops the command; Forge never guesses.
+- Python tools defined in your repository are not tool connectors and are not
+  listed.
+
+For adapter tools, build the inventory in Python:
+
+```python
+from forge.tools.mcp.inventory import build_inventory, inventory_rows, write_inventory
+
+rows = []
+async with mount(CrmConnector(), "crm", approvals) as connector:
+    rows.extend(inventory_rows(connector)[0])
+write_inventory(build_inventory(rows), Path("tool-inventory.json"))
+```
+
 ## Serving Forge's tools over MCP
 
 `forge mcp serve` (or `forge.tools.mcp.serve.McpToolServer`) exposes named
@@ -228,20 +310,32 @@ return `True` to allow. They receive AgentPolicyPack-shaped requests:
 {
     "action": "mcp.server.connect",
     "resource": {
+        "id": "files",
         "type": "McpServer",
-        "server_id": "files",
-        "transport": "streamable_http",
-        "origin": "http://127.0.0.1:8765",
-        "hosting": "local",
+        "attributes": {
+            "transport": "streamable_http",
+            "origin": "http://127.0.0.1:8765",
+            "hosting": "local",
+        },
     },
 }
 
 {
     "action": "tool.call",
+    "resource": {
+        "id": "files/search",
+        "type": "McpTool",
+        "attributes": {"server_id": "files", "hosting": "local"},
+    },
     "tool": {"name": "search", "namespace": "mcp.files", "definition_sha256": "..."},
-    "arguments": {"query": "refunds"},
+    "context": {"arguments": {"query": "refunds"}},
 }
 ```
+
+They validate as AgentPolicyPack `DecisionRequest`s, so a bundle can target
+servers by `resources.ids` and `resources.attributes` (for example
+`hosting: hosted`) and tools by `tools.names` and `tools.namespaces`.
+AgentPolicyPack ships a tested example in `examples/mcp_governance/`.
 
 A denied connect never contacts the server.
 

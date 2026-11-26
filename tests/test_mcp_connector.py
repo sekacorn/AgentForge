@@ -153,11 +153,9 @@ async def test_a_denied_connect_never_contacts_the_server() -> None:
         {
             "action": "mcp.server.connect",
             "resource": {
+                "id": "files",
                 "type": "McpServer",
-                "server_id": "files",
-                "transport": "in_process",
-                "origin": None,
-                "hosting": "local",
+                "attributes": {"transport": "in_process", "origin": None, "hosting": "local"},
             },
         }
     ]

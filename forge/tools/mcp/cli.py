@@ -29,9 +29,10 @@ escaped, and never through a markup renderer.
 from __future__ import annotations
 
 import asyncio
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Final
+from typing import Annotated, Any, Final
 
 import typer
 
@@ -453,3 +454,68 @@ def serve(
     where = f"http://{host}:{port}/mcp" if http else "stdio"
     typer.echo(f"Serving {', '.join(config.expose)} over {where}; every call is audited.", err=True)
     asyncio.run(server.run_http() if http else server.run_stdio())
+
+
+# --- forge tools inventory -------------------------------------------------------------------
+
+tools_app = typer.Typer(
+    name="forge tools",
+    help="Describe the tool connectors Forge uses.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+
+
+@tools_app.callback()
+def _tools_callback() -> None:
+    """Describe the tool connectors Forge uses."""
+
+
+@tools_app.command("inventory")
+def inventory(
+    config: ConfigOption = Path("mcp-servers.toml"),
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Write here instead of stdout.")
+    ] = None,
+    server: Annotated[
+        list[str] | None, typer.Option("--server", help="Only this server (repeatable).")
+    ] = None,
+) -> None:
+    """Write tool-inventory.v1 for the approved tools of each configured server.
+
+    Every tool carries the backend its server declares in mcp-servers.toml.
+    Tools that are not approved are not callable, so they are left out and
+    listed on stderr.
+    """
+    from forge.tools.mcp.inventory import build_inventory, render_inventory, write_inventory
+
+    servers_file, base = _load(config)
+    try:
+        approvals = ToolApprovals.load(base / servers_file.approvals)
+    except ValueError as exc:
+        raise _fail(str(exc)) from None
+    rows: list[dict[str, Any]] = []
+    skipped: list[str] = []
+
+    async def run() -> None:
+        from forge.tools.mcp.inventory import inventory_rows
+
+        for server_config in _selected(servers_file, server):
+            async with _open_connector(server_config, approvals) as connector:
+                found, missed = inventory_rows(connector)
+                rows.extend(found)
+                skipped.extend(missed)
+
+    _run(run())
+    try:
+        document = build_inventory(rows)
+    except ForgeError as exc:
+        raise _fail(str(exc)) from None
+    for line in skipped:
+        typer.echo(f"skipped {line}: not approved, so not callable", err=True)
+    if output is None:
+        # Plain stdout: the document must not pass through a renderer.
+        sys.stdout.write(render_inventory(document))
+        return
+    write_inventory(document, output)
+    typer.echo(f"tool inventory ({len(rows)} tool(s)) written to {output}", err=True)

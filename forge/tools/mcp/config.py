@@ -27,6 +27,7 @@ from forge.models.endpoints import (
     hosting_for,
     validate_default_query,
 )
+from forge.tools.mcp.backend import SELF_CONTAINED, BackendDeclaration
 from forge.tools.mcp.bounds import SERVER_ID
 
 Transport = Literal["streamable_http", "stdio", "in_process"]
@@ -50,8 +51,18 @@ class McpServerConfig(BaseModel):
     args: list[str] = Field(default_factory=list)
     env_allowlist: list[str] = Field(default_factory=list)
     timeout_seconds: float = Field(default=30.0, gt=0, le=600)
+    #: What this server's tools depend on: ``"self-contained"`` or a :class:`Backend`.
+    #: Required in ``mcp-servers.toml``; ``None`` (undeclared) is refused by
+    #: ``forge tools inventory``.
+    backend: BackendDeclaration | None = None
+    #: Per-tool overrides of ``backend``, keyed by the tool's name on the server.
+    tool_backends: dict[str, BackendDeclaration] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    def backend_for(self, tool_name: str) -> BackendDeclaration | None:
+        """The declared backend of one tool, or ``None`` if nothing was declared."""
+        return self.tool_backends.get(tool_name, self.backend)
 
     @field_validator("server_id")
     @classmethod
@@ -151,6 +162,12 @@ class McpServersFile(BaseModel):
 
     @model_validator(mode="after")
     def _servers(self) -> McpServersFile:
+        undeclared = [server.server_id for server in self.servers if server.backend is None]
+        if undeclared:
+            raise ValueError(
+                "Every server in mcp-servers.toml declares backend "
+                f'("{SELF_CONTAINED}" or a table): {", ".join(undeclared)}.'
+            )
         ids = [server.server_id for server in self.servers]
         if len(set(ids)) != len(ids):
             raise ValueError("Two servers in mcp-servers.toml share a server_id.")
