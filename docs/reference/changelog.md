@@ -34,6 +34,47 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `MemoryBackendError`) saying what to run; it never surfaces a raw database
   error, and its pool is closed.
 
+- **Memory export and import** (`forge.memory.transfer`, Phase 4a checkpoint 4).
+  `export_memory` writes a portable store as `agent-memory.v1` into an empty
+  directory: items in digested JSONL shards, tombstones as an ID and a time,
+  and the vectors in a linked `embedding-portability.v1` whose records are the
+  items, recomputed over exactly the exported text so each vector is bound to
+  its item by `content_sha256`. Bytes are canonical, so the same store exports
+  identically. `export_conversation` writes a conversation transcript (messages
+  numbered `msg-000000`, ...). `import_memory` re-checks every digest, applies
+  the export's tombstones first, imports items as quarantined, and writes an
+  `agent-memory-import.v1` report bound to the export's digest. The AI
+  Infrastructure Suite scores such an export at 25 for the `memory` vector.
+- **No secrets leave.** An export stops, writing nothing, if any item's text or
+  metadata still looks like a credential (private keys, cloud access-key IDs,
+  common API-token formats, JWTs, bearer headers, URLs with credentials); the
+  error names the item and the kind, never the value, and lists the ways to
+  proceed. There is no option to export the credential itself:
+  - `redact_secrets=True` (`--redact-secrets`) replaces each detected
+    credential with `[REDACTED:<kind>]` and records the redaction profile in
+    the document (`secrets`, or `pii-and-secrets` with `redact_pii`);
+  - `exclude={item_id: reason}` (`--exclude ITEM --exclude-reason "..."`) leaves
+    named items out of this export; the reason is required, each exclusion is
+    recorded in the audit log as `agentforge.memory.export_exclusion` with the
+    operator and the export digest, and the item is not deleted;
+  - or delete the item under policy, which leaves a tombstone.
+  `redact_pii=True` applies the PII redactor first and records it too.
+- **Review before use.** `forge.memory.review.list_quarantine` shows quarantined
+  items with their source and any prompt-injection indicators, never their
+  text. `review_items` activates or rejects them by ID or by export; a flagged
+  item is activated only on its own with `accept_flagged=True`, and bulk
+  activation skips flagged items. Decisions can be recorded in the audit log as
+  `agentforge.memory.review`.
+- **Memory is never a system prompt.** `forge.memory.context.memory_context_message`
+  renders retrieved memory as a quoted, labelled, untrusted block in a user
+  message; a test scans the package so that no function both searches memory
+  and builds a system message.
+- CLI: `forge memory export`, `forge memory import` (audited as
+  `agentforge.memory.import`), `forge memory quarantine`, `forge memory review`.
+- The `suite-contract` job now also checks every memory export variant, the
+  conversation export and the import report against the suite's schemas and
+  readers, including a `memory_inventory` score of 25.
+
 ### Changed
 - **Additive schema migrations, run when a store opens or by
   `forge memory migrate`.** Every statement is idempotent; nothing is dropped,

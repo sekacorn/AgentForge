@@ -256,3 +256,46 @@ lacks ALTER or CREATE privileges, opening the store fails with
 is reported, never skipped: drop it with `DROP INDEX CONCURRENTLY` and run
 `forge memory migrate` again.
 
+### Exporting, importing and reviewing
+
+```bash
+forge memory export ./memory-export --export-id exp-2026-12-01   # agent-memory.v1
+forge memory import ./memory-export --report ./import-report.json
+forge memory quarantine                                          # what arrived, never the text
+forge memory review --from-export exp-2026-12-01 --activate --reviewer alice
+forge memory review mem_42 --activate --accept-flagged --reviewer alice
+```
+
+An export is a directory: `agent-memory.json` with the digest of everything
+else, the items in JSONL shards, and the vectors in a linked
+`embedding-portability.v1` inventory. The AI Infrastructure Suite reads it as
+evidence for the `memory` lock-in vector; with the import report beside it, a
+verified export scores 25.
+
+- **Credentials stop the export.** If any item still looks like a secret, the
+  export writes nothing and names the item and the kind of secret, never the
+  value. There is no way to export the secret itself. To proceed, choose one:
+  - `--redact-secrets` replaces each detected credential with
+    `[REDACTED:<kind>]`; the document records that secrets were redacted.
+  - `--exclude ITEM --exclude-reason "why"` (repeatable) leaves those items out
+    of this export, for example a reviewed false positive. The reason is
+    required and each exclusion is written to the audit log with the operator
+    (`--operator`) and the export digest. The item stays in the store.
+  - Delete the item under policy; it then travels only as a tombstone.
+
+  `--redact-pii` applies the PII redactor first.
+- **Deleted items stay deleted.** They travel as tombstones (an ID and a
+  time), which the import applies before anything else.
+- **Imports are quarantined.** Nothing imported is searchable until reviewed.
+  `forge memory quarantine` lists each item's source and any prompt-injection
+  indicators. Bulk activation skips flagged items; activate one deliberately
+  with `--accept-flagged`, or reject it, which also stops it being imported
+  again. Decisions are recorded in the audit log.
+- **Memory never becomes a system prompt.** Put retrieved memory in front of a
+  model with `forge.memory.context.memory_context_message`, which quotes it in a
+  user message and labels it untrusted.
+
+What an export **cannot** promise: that the source system really deleted
+anything, that earlier exports, backups or caches no longer hold the data, or
+that the redaction caught every kind of personal data.
+
