@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 import pytest
@@ -20,10 +21,8 @@ MESSAGE = "install 'agentforge-oss[sqlite]' then fix [bold]this[/] and [/] [link
 
 def _all_output(result: Any) -> str:
     stderr = ""
-    try:
+    with contextlib.suppress(ValueError):  # older click: stderr not captured separately
         stderr = result.stderr
-    except ValueError:  # older click: stderr not captured separately
-        pass
     return result.output + stderr
 
 

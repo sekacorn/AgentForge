@@ -116,6 +116,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   app in tests).
 
 ### Fixed
+- **CLI error messages print as plain text.** `forge run`, `forge providers
+  inventory`, `forge memory migrate` and every command that fails through the
+  shared `_fail` helper interpolated the error message into a Rich markup
+  string. Text in square brackets was therefore read as markup:
+  - swallowed (`agentforge-oss[sqlite]` printed as `agentforge-oss`);
+  - restyled;
+  - or, for an unmatched closing tag, turned into a `MarkupError` instead of
+    the error.
+
+  **Affects every published version through 0.5.9.** Messages are now printed
+  verbatim; only the `Error:` label is styled.
 - **`ToolRegistry.register` no longer replaces a same-named tool silently.
   Affects every published version through 0.5.9.** Registering a second tool
   under a name already in use swapped it in without any signal, so whatever
