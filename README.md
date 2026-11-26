@@ -17,6 +17,8 @@ with cost-awareness, security, and compliance built in from line one.**
 
 </div>
 
+> **Status:** `0.5.10` **Beta**. Typed, tested and offline by default; APIs may still change before 1.0.
+
 ---
 
 ## Why Forge?
@@ -71,26 +73,37 @@ An honest snapshot of what works today versus what is on the way. Everything mar
 | OpenAI provider (gpt-4o-mini, gpt-4o, gpt-4.1, o3) | Shipped |
 | Offline deterministic provider (zero config, no API key) | Shipped |
 | Ollama provider (local models, zero cost, no API key, explicit opt-in) | Shipped |
-| Amazon Bedrock provider (Claude/Llama/Mistral via Converse, in-account/GovCloud) | Shipped |
+| Amazon Bedrock provider (Claude/Llama/Mistral via the Converse API) | Shipped |
+| OpenAI-compatible endpoints and named provider presets (`provider-presets.v1`, `default_query`) | Shipped |
+| Provider inventory for vendor-exit reports (`forge providers inventory`, `provider-inventory.v1`) | Shipped |
 | Pre-flight + per-step budget caps | Shipped |
 | Tool sandboxing (allowlist/denylist, timeouts, dangerous-denied-by-default) | Shipped |
 | RBAC (admin / operator / developer / viewer) | Shipped |
 | Prompt-injection heuristics + input sanitization | Shipped |
 | SHA-256 hash-chained tamper-evident audit log | Shipped |
 | PII redaction (emails, cards, SSNs, IPs, phones) | Shipped |
-| Event bus (25 lifecycle event types) | Shipped |
+| Event bus (30 lifecycle event types) | Shipped |
 | Streaming token output through the event bus (`stream=True`) | Shipped |
 | Per-run cost reporting (tokens + USD, per model, per agent) | Shipped |
 | OpenTelemetry export (traces + metrics: console or OTLP to Jaeger/Grafana/Datadog) | Shipped |
 | Conversation memory + in-memory RAG vector store | Shipped |
 | Durable memory backend (SQLite, persistent RAG, no vector extension) | Shipped |
-| CLI (`forge run`, `forge models`, `forge audit`) | Shipped |
+| CLI (`forge run`, `models`, `audit`, `providers`, `memory`, `mcp`, `tools`) | Shipped |
 | Offline-focused test suite, mypy strict, ruff clean, CI on 3.11 / 3.12 / 3.13 | Shipped |
 | Durable memory backend (pgvector, PostgreSQL + IVFFlat ANN, asyncpg) | Shipped |
+| Portable memory: `agent-memory.v1` export and import, tombstones, quarantine and review, additive migrations | Shipped |
+| MCP tool connectors (protocol 2026-07-28): approvals by definition hash, rug-pull defense, OAuth (`iss` required, CIMD only) | Shipped (`[mcp]` extra) |
+| `forge mcp approve`: field-by-field definition diffs, no blind approvals | Shipped (`[mcp]` extra) |
+| Serving Forge tools over MCP, default-deny (`forge mcp serve`) | Shipped (`[mcp]` extra) |
+| `ToolConnector` adapter and `forge tools inventory` (`tool-inventory.v1`) | Shipped (`[mcp]` extra) |
 | Durable memory backends (Redis) | Planned |
 | Vertex / other cloud providers | Planned |
 | Policy-as-code governance (deny / approve / log rules, human-in-the-loop gates) | Shipped |
 | Hosted SaaS control plane (TypeScript / Next.js) | Future |
+
+Hosted providers (Anthropic, OpenAI, Bedrock, OpenAI-compatible) are verified
+against **offline provider-shaped fakes** in CI, never against live vendor
+accounts. MCP connectors are verified against in-process fake servers.
 
 ---
 
@@ -147,6 +160,31 @@ An honest snapshot of what works today versus what is on the way. Everything mar
   alongside a deterministic offline echo provider; add any provider by implementing
   one method.
 
+### Portable memory
+- **Leave with your memory.** `forge memory export` writes the SQLite, pgvector
+  or in-memory store as `agent-memory.v1`, with digested shards and the linked
+  vectors. The AI Infrastructure Suite verifies and scores it.
+- **A credential never leaves.** An export stops if any item holds one. To
+  proceed, redact it or exclude the item; either decision is audited.
+- **Imported memory is untrusted.** Imports land quarantined, deletions leave
+  tombstones, and memory is never placed in a system prompt.
+  `forge memory review` activates or rejects items.
+- See the [memory guide](docs/guides/memory.md).
+
+### MCP tool connectors (`agentforge-oss[mcp]`)
+- **Connect** to MCP servers on the 2026-07-28 protocol. Only tools whose exact
+  definition a person approved are offered to a model, and a changed definition
+  is refused until it is re-approved.
+- **Approve** with `forge mcp approve`. It shows a field-by-field diff of what
+  changed, and a changed or flagged tool is confirmed by typing its name.
+- **Serve** Forge tools with `forge mcp serve`. Nothing is exposed unless named,
+  dangerous tools need a separate opt-in, HTTP requires authorization, and
+  every inbound call is audited.
+- **Inventory** with `forge tools inventory`. Every tool records the backend it
+  depends on, for the suite's `tool_connectors` vector. A proprietary
+  connector goes behind the `ToolConnector` adapter.
+- See the [MCP guide](docs/guides/mcp.md).
+
 ### Security from the start
 - **Tool sandboxing** with allowlists/denylists, per-tool timeouts, and
   **dangerous (network/filesystem) tools denied unless explicitly allowed**.
@@ -182,7 +220,7 @@ policy.add(
 ```
 
 ### Observability built in
-- A structured **event bus** emits **25 distinct lifecycle event types** — run, agent,
+- A structured **event bus** emits **30 distinct lifecycle event types** — run, agent,
   and worker start/finish (including `WORKER_STARTED` and `WORKER_FAILED` for parallel
   execution), model routing and calls, tool calls, budget thresholds, and security
   violations — so any subscriber (console, audit, metrics) sees the same stream.
@@ -208,6 +246,8 @@ pip install "agentforge-oss[openai]"             # + OpenAI / GPT provider
 pip install "agentforge-oss[anthropic,openai]"   # both real providers
 pip install "agentforge-oss[bedrock]"            # + Amazon Bedrock provider (boto3)
 pip install "agentforge-oss[pgvector]"           # + PostgreSQL RAG (asyncpg + pgvector)
+pip install "agentforge-oss[sqlite]"             # + durable SQLite memory (aiosqlite)
+pip install "agentforge-oss[mcp]"                # + MCP tool connectors (mcp SDK)
 pip install "agentforge-oss[all,dev]"            # everything + test/lint tooling
 ```
 
@@ -248,6 +288,16 @@ forge models
 
 # Verify the audit log hasn't been tampered with.
 forge audit
+
+# Portable memory: export, import, review.
+forge memory export ./memory-export
+forge memory quarantine
+
+# MCP (needs agentforge-oss[mcp]).
+forge mcp status
+forge mcp approve --approved-by alice --tool files/search
+forge mcp serve --expose calculator
+forge tools inventory --output tool-inventory.json
 ```
 
 `--verbose` streams a live trace so you can watch the supervisor plan, route each
@@ -418,7 +468,18 @@ questions already have answers.
 
 ---
 
-## Security & compliance posture
+## Security
+
+### Advisories
+
+| Advisory | Affected | Fixed in |
+|---|---|---|
+| [GHSA-r9m2-584h-q5c5](https://github.com/sekacorn/AgentForge/security/advisories/GHSA-r9m2-584h-q5c5): credentials could leak into exception messages, tracebacks and logs through provider errors and request URLs | `<= 0.5.5` | `0.5.6` |
+
+Report a vulnerability as described in [SECURITY.md](SECURITY.md). All published
+advisories are at [github.com/sekacorn/AgentForge/security/advisories](https://github.com/sekacorn/AgentForge/security/advisories).
+
+### Security & compliance posture
 
 - **Least privilege by default.** Dangerous tools (network egress, filesystem) are
   denied unless you explicitly allowlist them.
@@ -428,12 +489,27 @@ questions already have answers.
   (or `Orchestrator.verify_audit()`) detects any tampering.
 - **Privacy aware.** PII redaction runs before anything is written to logs or audit.
 - **Access control.** RBAC gates sensitive operations; map roles to your IdP groups.
+- **Credentials stay out of URLs and logs.** Configured URLs refuse credentials,
+  query strings and fragments; required parameters go in `default_query`, redacted.
+- **Untrusted tools stay untrusted.** MCP tool definitions are approved by hash,
+  results are marked untrusted, and server text never reaches a system prompt.
 
 > Forge gives you strong application-level controls. It is not a substitute for OS-
 > level isolation when executing untrusted code — for that, run tools in a container
 > or microVM behind the same `ToolSandbox` interface. The design makes that a drop-in.
 > Audit writes are serialized for logger instances in the same process; coordinating
 > multiple processes that share one audit file remains an operator responsibility.
+
+---
+
+## Documentation
+
+- [Documentation site](https://sekacorn.github.io/AgentForge/)
+- Guides: [providers](docs/guides/providers.md), [memory](docs/guides/memory.md),
+  [tools](docs/guides/tools.md), [MCP](docs/guides/mcp.md),
+  [governance](docs/guides/governance.md), [observability](docs/guides/observability.md)
+- Reference: [API](docs/reference/api.md), [configuration](docs/reference/configuration.md),
+  [changelog](CHANGELOG.md)
 
 ---
 
