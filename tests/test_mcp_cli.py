@@ -33,11 +33,13 @@ schema_version = "mcp-servers.v1"
 server_id = "files"
 transport = "stdio"
 command = "unused-in-tests"
+backend = "self-contained"
 
 [[servers]]
 server_id = "wiki"
 transport = "stdio"
 command = "unused-in-tests"
+backend = { system = "wiki-saas", portability = "vendor_only", reconstruction = "documented" }
 """
 
 
@@ -336,7 +338,9 @@ def test_an_empty_approver_is_refused(ws: Workspace) -> None:
             "relative",
         ),
         (
-            SERVERS + '\n[[servers]]\nserver_id = "files"\ntransport = "stdio"\ncommand = "x"\n',
+            SERVERS
+            + '\n[[servers]]\nserver_id = "files"\ntransport = "stdio"\ncommand = "x"\n'
+            + 'backend = "self-contained"\n',
             "share a server_id",
         ),
         ('schema_version = "mcp-servers.v1"\nsurprise = 1\nservers = []\n', "surprise"),

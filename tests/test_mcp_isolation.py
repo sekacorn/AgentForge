@@ -2,7 +2,7 @@
 
 Two checks, because they fail differently:
 
-* **Static:** no module outside ``forge/tools/mcp/{connector,auth,serve}.py`` imports
+* **Static:** no module outside ``forge/tools/mcp/{connector,auth,serve,adapter}.py`` imports
   ``mcp``, ``mcp_types`` or ``httpx2``, and no core module imports
   ``forge.tools.mcp`` at all.
 * **Dynamic:** importing ``forge`` and every core submodule in a fresh
@@ -23,6 +23,7 @@ SDK_USERS = {
     FORGE / "tools" / "mcp" / "connector.py",
     FORGE / "tools" / "mcp" / "auth.py",
     FORGE / "tools" / "mcp" / "serve.py",
+    FORGE / "tools" / "mcp" / "adapter.py",
 }
 MCP_PACKAGE = FORGE / "tools" / "mcp"
 

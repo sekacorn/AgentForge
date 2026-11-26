@@ -176,6 +176,8 @@ class McpConnector:
         self._seen: set[str] = set()
         self._vanished: set[str] = set()
         self._reported: set[tuple[str, str | None]] = set()
+        #: True for a connector built by :func:`forge.tools.mcp.adapter.mount`.
+        self.adapter = False
 
     # --- connection ----------------------------------------------------------------------
 
@@ -184,11 +186,13 @@ class McpConnector:
         return {
             "action": "mcp.server.connect",
             "resource": {
+                "id": self.config.server_id,
                 "type": "McpServer",
-                "server_id": self.config.server_id,
-                "transport": self.config.transport,
-                "origin": self.config.origin,
-                "hosting": self.config.hosting,
+                "attributes": {
+                    "transport": self.config.transport,
+                    "origin": self.config.origin,
+                    "hosting": self.config.hosting,
+                },
             },
         }
 
@@ -605,15 +609,21 @@ class McpTool(Tool):
         raise McpError("McpTool is invoked through its connector.")
 
     def policy_request(self, arguments: Mapping[str, Any]) -> dict[str, Any]:
-        """The ``tool.call`` policy request for one call."""
+        """The ``tool.call`` policy request for one call (AgentPolicyPack's request shape)."""
+        config = self.connector.config
         return {
             "action": "tool.call",
+            "resource": {
+                "id": f"{config.server_id}/{self.remote_name}",
+                "type": "McpTool",
+                "attributes": {"server_id": config.server_id, "hosting": config.hosting},
+            },
             "tool": {
                 "name": self.remote_name,
-                "namespace": self.connector.config.namespace,
+                "namespace": config.namespace,
                 "definition_sha256": self.definition_sha256,
             },
-            "arguments": dict(arguments),
+            "context": {"arguments": dict(arguments)},
         }
 
     async def invoke(self, arguments: dict[str, Any]) -> str:

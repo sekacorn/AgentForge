@@ -167,3 +167,58 @@ def test_a_tool_without_a_backend_key_is_refused() -> None:
         jsonschema.validate(document, _schema())
     with pytest.raises(ValueError):
         tool_inventory.parse_tool_inventory(json.dumps(document).encode())
+
+
+async def test_an_inventory_written_by_forge_passes_the_suite_and_scores_the_backend(
+    tmp_path: Any,
+) -> None:
+    """The real writer: an adapter tool and a configured server, scored by the suite."""
+    pytest.importorskip("mcp")
+    import hashlib
+
+    from tests import mcp_fakes
+
+    from forge.tools.mcp.adapter import ToolDescription, mount
+    from forge.tools.mcp.backend import SELF_CONTAINED, Backend
+    from forge.tools.mcp.connector import McpConnector
+    from forge.tools.mcp.inventory import build_inventory, inventory_rows, write_inventory
+
+    class Crm:
+        backend = Backend(system="crm-vendor-api", portability="vendor_only", reconstruction="none")
+
+        def describe(self) -> list[ToolDescription]:
+            return [ToolDescription("lookup", "Look up a customer.", {"type": "object"})]
+
+        async def call(self, name: str, arguments: dict[str, Any]) -> Any:
+            return "ok"
+
+    files = McpServerConfig(server_id="files", transport="in_process", backend=SELF_CONTAINED)
+    approvals = ToolApprovals()
+    async with McpConnector(files, approvals, server=mcp_fakes.honest().server()) as c:
+        approvals = approvals.with_approval(c.approve("search", approved_by="alice"))
+    async with mount(Crm(), "crm", approvals) as c:
+        approvals = approvals.with_approval(c.approve("lookup", approved_by="alice"))
+    rows: list[dict[str, Any]] = []
+    async with McpConnector(files, approvals, server=mcp_fakes.honest().server()) as c:
+        rows.extend(inventory_rows(c)[0])
+    async with mount(Crm(), "crm", approvals) as c:
+        rows.extend(inventory_rows(c)[0])
+    write_inventory(build_inventory(rows), tmp_path / "tool-inventory.json")
+    approvals.save(tmp_path / "tool-approvals.json")
+
+    data = (tmp_path / "tool-inventory.json").read_bytes()
+    jsonschema.validate(json.loads(data), _schema())
+    entry = {
+        "state": "tool_inventory",
+        "path": "tool-inventory.json",
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "approvals": {
+            "path": "tool-approvals.json",
+            "sha256": hashlib.sha256((tmp_path / "tool-approvals.json").read_bytes()).hexdigest(),
+        },
+    }
+    result = tool_vector.build_vector(tmp_path, entry)
+    scores = {row["tool_id"]: (row["approval"], row["score"]) for row in result.section}
+    assert scores == {"files__search": ("approved", 25), "crm__lookup": ("approved", 100)}
+    assert result.row["score"] == 100
+    assert "that each tool's declared backend is accurate" in result.row["attested_claims"]
