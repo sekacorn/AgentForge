@@ -70,6 +70,14 @@ Or pass tools as a plain list to `Orchestrator.run()`:
 result = await forge.run("...", tools=[calculator, my_tool])
 ```
 
+Tool names are unique within a registry. Registering a different tool under a
+name that is already taken raises `DuplicateToolError` rather than silently
+swapping what agents run. To replace a tool on purpose, say so:
+
+```python
+tools.register(my_tool, replace=True)
+```
+
 ---
 
 ## Built-in tools

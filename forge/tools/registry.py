@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from forge.exceptions import ToolNotFoundError
+from forge.exceptions import DuplicateToolError, ToolNotFoundError
 from forge.tools.base import Tool
 from forge.types import ToolSchema
 
@@ -17,13 +17,28 @@ class ToolRegistry:
         for tool in tools or []:
             self.register(tool)
 
-    def register(self, tool: Tool) -> None:
-        """Add (or replace) a tool by name."""
+    def register(self, tool: Tool, *, replace: bool = False) -> None:
+        """Add a tool by name.
+
+        A name that is already registered is refused with
+        :class:`~forge.exceptions.DuplicateToolError` unless ``replace=True``.
+        Silently swapping a tool for another of the same name would change what
+        an agent runs without anyone seeing it, so replacement must be asked for.
+        Registering the very same tool object again is a no-op.
+        """
+        existing = self._tools.get(tool.name)
+        if existing is not None and existing is not tool and not replace:
+            raise DuplicateToolError(
+                f"A tool named {tool.name!r} is already registered; "
+                "pass replace=True to replace it.",
+                context={"tool": tool.name},
+            )
         self._tools[tool.name] = tool
 
-    def extend(self, tools: Iterable[Tool]) -> None:
+    def extend(self, tools: Iterable[Tool], *, replace: bool = False) -> None:
+        """Register several tools; see :meth:`register` for duplicates."""
         for tool in tools:
-            self.register(tool)
+            self.register(tool, replace=replace)
 
     def get(self, name: str) -> Tool:
         try:

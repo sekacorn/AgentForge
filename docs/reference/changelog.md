@@ -8,6 +8,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **`ToolRegistry.register` no longer replaces a same-named tool silently.
+  Affects every published version through 0.5.9.** Registering a second tool
+  under a name already in use swapped it in without any signal, so whatever
+  an agent ran under that name could change unseen (an in-process rug pull).
+  It now raises the new `DuplicateToolError` (a `ToolError`, exported from
+  `forge`). The same applies to `ToolRegistry(...)` and `extend(...)`.
+  Replacement must be explicit: `register(tool, replace=True)` or
+  `extend(tools, replace=True)`. Registering the very same tool object again
+  is a no-op. **Migration:** code that relied on re-registering a name to
+  override a tool must pass `replace=True`.
+
 ## [0.5.9] - 2026-11-25
 
 Portable memory (Phase 4a). The bundled memory stores can now be exported as

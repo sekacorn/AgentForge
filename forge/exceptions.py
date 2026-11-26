@@ -66,6 +66,10 @@ class ToolNotFoundError(ToolError):
     """A requested tool is not registered."""
 
 
+class DuplicateToolError(ToolError):
+    """A tool with this name is already registered and replacement was not requested."""
+
+
 class ToolValidationError(ToolError):
     """Tool arguments failed validation against the tool's schema."""
 
