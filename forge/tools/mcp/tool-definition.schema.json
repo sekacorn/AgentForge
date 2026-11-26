@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sekacorn/agentforge/schemas/tool-definition.schema.json",
+  "title": "tool-definition.v1",
+  "description": "A snapshot of one approved MCP tool definition, stored as tool-definitions/<definition_sha256>.json next to tool-approvals.v1. definition_sha256 is the SHA-256 of the RFC 8785 canonical JSON of definition; the reader recomputes it and refuses any mismatch. Server-supplied text in it is untrusted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "definition_sha256",
+    "definition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tool-definition.v1"
+    },
+    "definition_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server_id",
+        "name",
+        "description",
+        "inputSchema",
+        "outputSchema",
+        "annotations"
+      ],
+      "properties": {
+        "server_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputSchema": {
+          "type": "object"
+        },
+        "outputSchema": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "annotations": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

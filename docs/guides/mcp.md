@@ -59,28 +59,75 @@ connector requires `server/discover`.
 
 ## Approving tools
 
-Approvals live in a `tool-approvals.v1` file in your repository, next to the
-configuration that names your servers. Tools are defined in your repository;
-servers are only where they run.
+Three files live in your repository, side by side:
 
-```python
-async with McpConnector(files, ToolApprovals()) as connector:
-    for found in connector.discovered():
-        print(found.name, found.state, found.reason)
-    approval = connector.approve("search", approved_by="alice")
-    approvals = approvals.with_approval(approval)
-    approvals.save(Path("tool-approvals.json"))  # then review and commit it
+| File | Format | Holds |
+|---|---|---|
+| `mcp-servers.toml` | `mcp-servers.v1` | The servers Forge may contact. A server not named here is never contacted. |
+| `tool-approvals.json` | `tool-approvals.v1` | Which definition hash of which tool a person approved. |
+| `tool-definitions/<sha256>.json` | `tool-definition.v1` | The approved definition itself, so a later change can be shown as a diff. |
+
+Tools are defined in your repository; servers are only where they run.
+
+```toml
+schema_version = "mcp-servers.v1"
+approvals = "tool-approvals.json"
+definitions = "tool-definitions"
+
+[[servers]]
+server_id = "files"
+transport = "streamable_http"
+url = "http://127.0.0.1:8765/mcp"
 ```
 
-`approve` approves the definition the server is offering **now**. Its
-description and schema are screened for prompt-injection indicators first. A
-flagged definition is refused unless you pass `accept_flagged=True` after
-reading it; the reasons you accepted are recorded in the approval as
-`accepted_flags`.
+### `forge mcp approve`
 
-The file is plain JSON with a JSON Schema at
-`forge/tools/mcp/tool-approvals.schema.json` and examples in
-`docs/examples/mcp/`:
+```bash
+forge mcp status                                   # every tool and its state
+forge mcp approve --approved-by alice --tool files/search
+forge mcp approve --approved-by alice --all-new    # new, unflagged tools only
+```
+
+Before each decision the command shows what you are approving:
+
+- a **new** tool: its full definition (description, input schema, output
+  schema, annotations);
+- a **changed** tool: a field-by-field diff of the definition you approved and
+  the one the server now offers, from its `tool-definition.v1` snapshot (if no
+  snapshot was recorded, it says so and shows the full new definition), plus
+  any change of server origin;
+- the **screening result**: the reasons for any flag, from the whole
+  description (not just the 1 KiB a model sees) and the schemas.
+
+The rules:
+
+- A **flagged** tool needs `--accept-flagged`, named with `--tool`.
+- A **changed or flagged** tool is confirmed by **typing its name**
+  (`files__search`); `y` is not enough. Without a prompt (`--yes`) it needs
+  `--expect-sha256` with the offered hash shown in its review, so a script
+  cannot approve a definition nobody looked at.
+- **`--all-new` never covers changed or flagged tools.** It lists them, each
+  with the command to review it on its own.
+- A new, unflagged tool takes `y` (or `--yes`).
+
+Each approval writes the snapshot, updates `tool-approvals.json`, and is
+recorded in the audit log as `agentforge.mcp.tool_approval` with the new and
+previous hashes. Commit the approvals file and the snapshots together. A
+snapshot is self-verifying: one edited by hand is refused, so it cannot make a
+change look smaller than it is.
+
+Server text is untrusted on your terminal too: control and bidirectional
+characters are printed as visible escapes (such as `\u001b` and `\u202e`) and nothing is
+rendered as markup.
+
+The same is available from Python: `connector.approve("search",
+approved_by="alice")` approves the definition offered **now** (flagged ones
+need `accept_flagged=True`); add it with `approvals.with_approval(...)`,
+record the definition with `DefinitionStore(...).save(found.definition())`,
+and save both.
+
+Each format has a JSON Schema in `forge/tools/mcp/` and examples in
+`docs/examples/mcp/`. An approvals file:
 
 ```json
 {

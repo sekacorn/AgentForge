@@ -9,6 +9,40 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`forge mcp status` and `forge mcp approve`.** Approving an MCP tool always
+  shows what is being approved:
+  - a new tool's full definition (description, input and output schema,
+    annotations);
+  - for a changed tool, a field-by-field diff against the approved definition,
+    plus any change of server origin;
+  - the screening reasons for any flag, taken from the whole description and
+    from the schemas.
+
+  The rules:
+  - A flagged tool needs `--accept-flagged`.
+  - A changed or flagged tool is confirmed by typing its name, never by y/n.
+    Without a prompt (`--yes`) it needs `--expect-sha256` with the offered
+    hash.
+  - `--all-new` covers only new, unflagged tools, and lists the rest for
+    individual review.
+  - Each approval is audited as `agentforge.mcp.tool_approval` with the new and
+    previous hashes.
+
+  Server text is printed with control and bidirectional characters escaped,
+  and never through a markup renderer. `forge mcp` loads the MCP package only
+  when it runs, and says how to install the extra when the SDK is missing.
+- **`mcp-servers.v1`** (`mcp-servers.toml`): the servers Forge may contact,
+  with paths to the approvals file and snapshot directory relative to it. It
+  has a JSON Schema and a fixture. It is a separate file because core
+  configuration never imports the MCP package.
+- **`tool-definition.v1`** snapshots (`tool-definitions/<sha256>.json`, beside
+  `tool-approvals.json`). They hold the approved definition so a later change
+  can be shown as a diff. Each is self-verifying, so an edited snapshot is
+  refused. It has a JSON Schema and a fixture.
+- `DiscoveredTool.raw_description` and `DiscoveredTool.definition()`.
+- A source-hygiene test: no file in `forge/`, `tests/`, `docs/` or `examples/`
+  may contain bidirectional-control or escape characters.
+
 - **MCP tool connectors (Phase 4b, client side).** Install `agentforge-oss[mcp]`,
   which adds the optional extra `mcp>=2.3,<3` (MIT). Core AgentForge never imports
   `mcp`, and a test enforces it both statically and in a fresh interpreter.
@@ -74,6 +108,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `ToolResult.untrusted` (default `False`) and `Tool.untrusted_results`
   (default `False`): the sandbox marks results from untrusted tools, such as
   MCP tools. Both are additive.
+
+### Changed
+- `McpConnector.screen()` now screens the full description, the output schema
+  and the annotations, not only the capped description and the input schema.
+- The connector takes `http_transport=` (custom TLS, a proxy, or an in-process
+  app in tests).
 
 ### Fixed
 - **`ToolRegistry.register` no longer replaces a same-named tool silently.
