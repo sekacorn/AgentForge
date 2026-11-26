@@ -72,7 +72,7 @@ from forge.tools.mcp.bounds import (
     model_text,
 )
 from forge.tools.mcp.config import McpServerConfig
-from forge.tools.mcp.hashing import definition_sha256
+from forge.tools.mcp.hashing import definition_document, definition_sha256
 
 PROTOCOL_VERSION: Final = "2026-07-28"
 AUDIT_DEFINITION_CHANGED: Final = "agentforge.mcp.tool_definition_changed"
@@ -103,6 +103,20 @@ class DiscoveredTool:
     output_schema: dict[str, Any] | None
     annotations: dict[str, Any] | None
     approved_sha256: str | None = None
+    #: The description exactly as the server sent it (``description`` is the capped,
+    #: cleaned copy a model sees). Untrusted: render it with ``terminal_safe``.
+    raw_description: str | None = None
+
+    def definition(self) -> dict[str, Any]:
+        """The exact document :attr:`definition_sha256` covers."""
+        return definition_document(
+            self.server_id,
+            self.name,
+            description=self.raw_description,
+            input_schema=self.input_schema,
+            output_schema=self.output_schema,
+            annotations=self.annotations,
+        )
 
 
 def _annotations(tool: types.Tool) -> dict[str, Any] | None:
@@ -360,6 +374,7 @@ class McpConnector:
                 output_schema,
                 annotations,
                 approved,
+                tool.description,
             )
 
         if tool.name in self._vanished:
@@ -452,8 +467,19 @@ class McpConnector:
     # --- approval --------------------------------------------------------------------------
 
     def screen(self, found: DiscoveredTool) -> list[str]:
-        """Injection indicators in a definition's description and schema text."""
-        text = found.description + "\n" + json.dumps(found.input_schema, ensure_ascii=False)
+        """Injection indicators in a definition's full description, schemas and annotations.
+
+        The whole description is screened, not only the capped part a model sees,
+        so text hidden past the cap is still reported to the reviewer.
+        """
+        text = "\n".join(
+            [
+                found.raw_description if found.raw_description is not None else found.description,
+                json.dumps(found.input_schema, ensure_ascii=False),
+                json.dumps(found.output_schema, ensure_ascii=False),
+                json.dumps(found.annotations, ensure_ascii=False),
+            ]
+        )
         return self._sanitizer.scan(text).reasons
 
     def approve(

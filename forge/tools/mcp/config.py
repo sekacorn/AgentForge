@@ -14,6 +14,8 @@ by naming the environment variable that holds them, never by value.
 from __future__ import annotations
 
 import os
+import tomllib
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -109,3 +111,72 @@ class McpServerConfig(BaseModel):
                 context={"server_id": self.server_id, "variable": self.bearer_token_env},
             )
         return token
+
+
+SERVERS_SCHEMA_VERSION = "mcp-servers.v1"
+SERVERS_SCHEMA_PATH = Path(__file__).with_name("mcp-servers.schema.json")
+MAX_SERVERS_FILE_BYTES = 256 * 1024
+
+
+def _relative(value: str) -> str:
+    if (
+        not value
+        or PurePosixPath(value).is_absolute()
+        or PureWindowsPath(value).is_absolute()
+        or PureWindowsPath(value).drive
+        or ".." in PurePosixPath(value.replace("\\", "/")).parts
+    ):
+        raise ValueError("Paths in mcp-servers.toml must be relative and stay beside the file.")
+    return value
+
+
+class McpServersFile(BaseModel):
+    """``mcp-servers.v1``: the servers Forge may contact, kept in the user's repository.
+
+    Written as TOML (``mcp-servers.toml``). Only HTTP and stdio servers can be
+    named here; ``approvals`` and ``definitions`` are relative to the file.
+    """
+
+    schema_version: Literal["mcp-servers.v1"]
+    approvals: str = "tool-approvals.json"
+    definitions: str = "tool-definitions"
+    servers: list[McpServerConfig] = Field(max_length=64)
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @field_validator("approvals", "definitions")
+    @classmethod
+    def _paths(cls, value: str) -> str:
+        return _relative(value)
+
+    @model_validator(mode="after")
+    def _servers(self) -> McpServersFile:
+        ids = [server.server_id for server in self.servers]
+        if len(set(ids)) != len(ids):
+            raise ValueError("Two servers in mcp-servers.toml share a server_id.")
+        if any(server.transport == "in_process" for server in self.servers):
+            raise ValueError("mcp-servers.toml names HTTP and stdio servers only.")
+        return self
+
+    def server(self, server_id: str) -> McpServerConfig:
+        for server in self.servers:
+            if server.server_id == server_id:
+                return server
+        raise ConfigurationError(
+            "No server with that server_id is configured.", context={"server_id": server_id}
+        )
+
+    @classmethod
+    def load(cls, path: Path) -> tuple[McpServersFile, Path]:
+        """Read the file; returns it with the directory its relative paths resolve against."""
+        if path.is_symlink() or not path.is_file():
+            raise ConfigurationError(
+                "mcp-servers.toml is missing or is a link.", context={"path": path.name}
+            )
+        if path.stat().st_size > MAX_SERVERS_FILE_BYTES:
+            raise ConfigurationError("mcp-servers.toml is over 256 KiB.")
+        try:
+            data = tomllib.loads(path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+            raise ConfigurationError("mcp-servers.toml is not valid UTF-8 TOML.") from None
+        return cls.model_validate(data), path.parent

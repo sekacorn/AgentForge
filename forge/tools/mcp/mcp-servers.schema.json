@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sekacorn/agentforge/schemas/mcp-servers.schema.json",
+  "title": "mcp-servers.v1",
+  "description": "The MCP servers Forge may contact, written as TOML (mcp-servers.toml) and shown here as its JSON equivalent. A server not named here is never contacted. approvals and definitions are paths relative to this file. server_id uniqueness is enforced by the reader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "servers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mcp-servers.v1"
+    },
+    "approvals": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "tool-approvals.v1 file, relative to this file. Default tool-approvals.json. The reader refuses an absolute path or one that leaves this file's directory."
+    },
+    "definitions": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "description": "Directory of tool-definition.v1 snapshots, relative to this file. Default tool-definitions. The reader refuses an absolute path or one that leaves this file's directory."
+    },
+    "servers": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "server_id",
+          "transport"
+        ],
+        "properties": {
+          "server_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+          },
+          "transport": {
+            "enum": [
+              "streamable_http",
+              "stdio"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "streamable_http only. No credentials, query string or fragment.",
+            "pattern": "^https?://[^@?# ]+$"
+          },
+          "default_query": {
+            "type": "object",
+            "maxProperties": 16,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          "bearer_token_env": {
+            "type": "string",
+            "description": "Name of the environment variable holding a bearer token; never the token.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "description": "stdio only. Run without a shell."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "env_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+            }
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 600
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "transport": {
+                  "const": "streamable_http"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "url"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "command"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "args"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "env_allowlist"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "transport": {
+                  "const": "stdio"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "command"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "url"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "default_query"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "bearer_token_env"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib
 import json as jsonlib
 import sys
 from collections.abc import Awaitable, Callable
@@ -495,6 +496,32 @@ def memory_review(
         err_console.print(
             f"  skipped {item_id}: {', '.join(found)} (review it alone with --accept-flagged)"
         )
+
+
+@app.command(
+    "mcp",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def mcp(ctx: typer.Context) -> None:
+    """Review and approve MCP tool definitions (needs agentforge-oss[mcp])."""
+    # Loaded only when this command runs, so core Forge never imports the MCP SDK.
+    try:
+        module = importlib.import_module("forge.tools.mcp.cli")
+    except ImportError as exc:
+        if getattr(exc, "name", None) and str(exc.name).split(".")[0] in {
+            "mcp",
+            "mcp_types",
+            "httpx2",
+        }:
+            # Plain echo: a Rich markup renderer would eat "[mcp]".
+            typer.echo(
+                "Error: MCP commands need the optional SDK: pip install 'agentforge-oss[mcp]'",
+                err=True,
+            )
+            raise typer.Exit(code=2) from exc
+        raise
+    module.app(args=list(ctx.args), prog_name="forge mcp")
 
 
 @app.command()

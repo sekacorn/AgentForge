@@ -1,0 +1,24 @@
+{
+  "definition": {
+    "annotations": null,
+    "description": "Search the knowledge base.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "description": "What to look for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "search",
+    "outputSchema": null,
+    "server_id": "files"
+  },
+  "definition_sha256": "0fd51c430bff67af9f809eb8d94565f0db9b3a2dc283b09c8120d2baeec31a35",
+  "schema_version": "tool-definition.v1"
+}

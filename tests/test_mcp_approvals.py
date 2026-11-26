@@ -295,3 +295,127 @@ def test_bearer_token_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("CRM_TOKEN", "t0ken")
     assert config.bearer_token() == "t0ken"
     assert "t0ken" not in config.model_dump_json()
+
+
+# --- tool-definition.v1 and mcp-servers.v1 ---------------------------------------------------
+
+
+def test_definition_snapshot_fixture_matches_schema_reader_and_approval() -> None:
+    from forge.tools.mcp.definitions import SCHEMA_PATH as DEFINITION_SCHEMA
+    from forge.tools.mcp.definitions import DefinitionStore
+
+    schema = json.loads(DEFINITION_SCHEMA.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator.check_schema(schema)
+    store = DefinitionStore(FIXTURES / "tool-definitions")
+    approval = ToolApprovals.load(FIXTURES / "tool-approvals.json").get("files", "search")
+    assert approval is not None
+    path = store.path(approval.definition_sha256)
+    jsonschema.validate(json.loads(path.read_bytes()), schema)
+    definition = store.load(approval.definition_sha256)
+    assert definition is not None and definition["name"] == "search"
+
+
+def test_definition_store_round_trip_and_tamper_checks(tmp_path: Path) -> None:
+    from forge.tools.mcp.definitions import DefinitionError, DefinitionStore
+    from forge.tools.mcp.hashing import definition_document, definition_sha256
+
+    store = DefinitionStore(tmp_path / "defs")
+    document = definition_document(
+        "files", "search", description="Search.", input_schema={"type": "object"}
+    )
+    digest = store.save(document)
+    assert digest == definition_sha256(
+        "files", "search", description="Search.", input_schema={"type": "object"}
+    )
+    assert store.save(document) == digest and store.load(digest) == document
+    assert store.load("b" * 64) is None
+    with pytest.raises(DefinitionError):
+        store.path("../x")
+    with pytest.raises(DefinitionError, match="exactly the keys"):
+        store.save({"name": "x"})
+    path = store.path(digest)
+    tampered = json.loads(path.read_text(encoding="utf-8"))
+    tampered["definition"]["description"] = "Edited."
+    path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(DefinitionError, match="does not match its hash"):
+        store.load(digest)
+    with pytest.raises(DefinitionError, match="does not match its hash"):
+        store.save(document)
+    renamed = store.path("c" * 64)
+    renamed.write_text(json.dumps({**tampered, "definition": document}), encoding="utf-8")
+    with pytest.raises(DefinitionError, match="does not match its hash"):
+        store.load("c" * 64)
+
+
+def test_rendering_escapes_untrusted_text_and_diffs_by_field() -> None:
+    from forge.tools.mcp.definitions import render_definition, render_diff, terminal_safe
+    from forge.tools.mcp.hashing import definition_document
+
+    assert terminal_safe("a\x1b[2Jb\u202ec\td\n") == "a\\u001b[2Jb\\u202ec\td\n"
+    old = definition_document("files", "s", description="One.", input_schema={"type": "object"})
+    new = definition_document(
+        "files",
+        "s",
+        description="Two.",
+        input_schema={"type": "object"},
+        annotations={"readOnlyHint": False},
+    )
+    diff = render_diff(old, new)
+    assert "description: CHANGED" in diff and "inputSchema: unchanged" in diff
+    assert "annotations: CHANGED" in diff and any(line.strip() == "-One." for line in diff)
+    assert render_diff(None, new)[0].startswith(
+        "The previously approved definition was not recorded"
+    )
+    assert "outputSchema:" in render_definition(new) and "    (none)" in render_definition(new)
+
+
+def test_servers_fixture_matches_schema_and_reader() -> None:
+    import tomllib
+
+    from forge.tools.mcp.config import SERVERS_SCHEMA_PATH, McpServersFile
+
+    schema = json.loads(SERVERS_SCHEMA_PATH.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator.check_schema(schema)
+    example = FIXTURES / "mcp-servers.toml"
+    jsonschema.validate(tomllib.loads(example.read_text(encoding="utf-8")), schema)
+    servers_file, _ = McpServersFile.load(example)
+    crm = servers_file.server("crm")
+    assert (crm.origin, crm.hosting, crm.bearer_token_env) == (
+        "https://mcp.crm.example.com",
+        "hosted",
+        "CRM_MCP_TOKEN",
+    )
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {
+            "schema_version": "mcp-servers.v1",
+            "servers": [{"server_id": "x", "transport": "in_process"}],
+        },
+        {"schema_version": "mcp-servers.v1", "servers": [{"server_id": "x", "transport": "stdio"}]},
+        {
+            "schema_version": "mcp-servers.v1",
+            "servers": [
+                {"server_id": "x", "transport": "streamable_http", "url": "https://u:p@h.example/"}
+            ],
+        },
+        {
+            "schema_version": "mcp-servers.v1",
+            "servers": [
+                {"server_id": "x", "transport": "stdio", "command": "c", "url": "http://127.0.0.1/"}
+            ],
+        },
+        {"schema_version": "mcp-servers.v1", "servers": [], "extra": True},
+    ],
+)
+def test_servers_schema_and_reader_agree_on_rejections(bad: dict[str, Any]) -> None:
+    from pydantic import ValidationError
+
+    from forge.tools.mcp.config import SERVERS_SCHEMA_PATH, McpServersFile
+
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(bad, json.loads(SERVERS_SCHEMA_PATH.read_text(encoding="utf-8")))
+    with pytest.raises((ValidationError, ConfigurationError, ValueError)):
+        McpServersFile.model_validate(bad)
