@@ -274,8 +274,16 @@ verified export scores 25.
 
 - **Credentials stop the export.** If any item still looks like a secret, the
   export writes nothing and names the item and the kind of secret, never the
-  value. Redact or delete it, then export again. `--redact-pii` applies the PII
-  redactor first.
+  value. There is no way to export the secret itself. To proceed, choose one:
+  - `--redact-secrets` replaces each detected credential with
+    `[REDACTED:<kind>]`; the document records that secrets were redacted.
+  - `--exclude ITEM --exclude-reason "why"` (repeatable) leaves those items out
+    of this export, for example a reviewed false positive. The reason is
+    required and each exclusion is written to the audit log with the operator
+    (`--operator`) and the export digest. The item stays in the store.
+  - Delete the item under policy; it then travels only as a tombstone.
+
+  `--redact-pii` applies the PII redactor first.
 - **Deleted items stay deleted.** They travel as tombstones (an ID and a
   time), which the import applies before anything else.
 - **Imports are quarantined.** Nothing imported is searchable until reviewed.

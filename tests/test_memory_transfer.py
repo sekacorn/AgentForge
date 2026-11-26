@@ -455,3 +455,94 @@ def test_cli_export_refusal_is_clean(tmp_path: Path, monkeypatch: pytest.MonkeyP
     result = runner.invoke(app, ["memory", "export", str(tmp_path / "out")])
     assert result.exit_code == 2
     assert PLANTED_SECRET not in result.output and "Traceback" not in result.output
+
+
+# --- proceeding past a flagged credential (redact or exclude, never export it) ---------------
+
+
+def _all_bytes(root: Path) -> str:
+    return "".join(p.read_text("utf-8") for p in root.rglob("*") if p.is_file())
+
+
+async def test_the_refusal_names_every_way_forward(tmp_path: Path) -> None:
+    store = await _source()
+    await store.add(f"the deploy key is {PLANTED_SECRET}")
+    with pytest.raises(MemoryTransferError) as raised:
+        await _export(tmp_path, store)
+    message = str(raised.value)
+    for way in ("--redact-secrets", "--exclude", "delete it under policy"):
+        assert way in message
+    assert "never exported" in message
+
+
+async def test_redacting_secrets_exports_without_the_credential(tmp_path: Path) -> None:
+    store = await _source()
+    await store.add(f"the deploy key is {PLANTED_SECRET}", metadata={"k": PLANTED_SECRET})
+    summary = await _export(tmp_path, store, redact_secrets=True)
+    written = _all_bytes(tmp_path / "export")
+    assert PLANTED_SECRET not in written
+    assert "[REDACTED:api_key_sk_prefix]" in written
+    assert json.loads(summary.path.read_bytes())["export"]["redaction_profile"] == "secrets"
+
+
+async def test_both_redactions_are_recorded_together(tmp_path: Path) -> None:
+    store = InMemoryVectorStore(dim=16)
+    await store.add(f"jane@example.com uses {PLANTED_SECRET}")
+    summary = await _export(tmp_path, store, redact_pii=True, redact_secrets=True)
+    assert json.loads(summary.path.read_bytes())["export"]["redaction_profile"] == "pii-and-secrets"
+
+
+async def test_excluding_a_flagged_item_is_audited_and_exports_the_rest(tmp_path: Path) -> None:
+    store = await _source()
+    flagged = await store.add(f"the deploy key is {PLANTED_SECRET}")
+    audit = AuditLogger(tmp_path / "audit.jsonl")
+    summary = await _export(
+        tmp_path,
+        store,
+        exclude={flagged: "false positive in a test fixture; reviewed"},
+        audit=audit,
+        actor="alice",
+    )
+    assert summary.excluded == (flagged,)
+    assert summary.items == 2
+    assert PLANTED_SECRET not in _all_bytes(tmp_path / "export")
+    assert flagged not in _all_bytes(tmp_path / "export")
+    (entry,) = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert entry["action"] == "agentforge.memory.export_exclusion"
+    assert (entry["actor"], entry["resource"], entry["outcome"]) == ("alice", flagged, "excluded")
+    assert audit.verify()
+    # Excluding is not deleting: the item stays, with no tombstone.
+    assert flagged in {r.item_id for r in (await store.list_records()).records}
+    assert flagged not in {t.item_id for t in await store.list_tombstones()}
+
+
+async def test_an_exclusion_needs_a_reason_and_a_real_item(tmp_path: Path) -> None:
+    store = await _source()
+    item_id = await store.add("anything")
+    with pytest.raises(MemoryTransferError, match="needs a reason"):
+        await _export(tmp_path / "a", store, exclude={item_id: " "})
+    with pytest.raises(MemoryTransferError, match="does not hold"):
+        await _export(tmp_path / "b", store, exclude={"mem_typo": "reason"})
+
+
+def test_cli_exclude_requires_a_reason(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FORGE_MEMORY_BACKEND", "sqlite")
+    monkeypatch.setenv("FORGE_MEMORY_PATH", str(tmp_path / "m.db"))
+    result = runner.invoke(app, ["memory", "export", str(tmp_path / "out"), "--exclude", "mem_1"])
+    assert result.exit_code == 2
+    assert "--exclude-reason" in result.output
+
+
+def test_cli_redact_secrets_proceeds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    async def seed() -> None:
+        async with SQLiteMemoryStore(tmp_path / "src.db") as store:
+            await store.add(f"token {PLANTED_SECRET}")
+
+    asyncio.run(seed())
+    monkeypatch.setenv("FORGE_MEMORY_BACKEND", "sqlite")
+    monkeypatch.setenv("FORGE_MEMORY_PATH", str(tmp_path / "src.db"))
+    result = runner.invoke(app, ["memory", "export", str(tmp_path / "out"), "--redact-secrets"])
+    assert result.exit_code == 0, result.output
+    assert PLANTED_SECRET not in _all_bytes(tmp_path / "out")

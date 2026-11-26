@@ -32,13 +32,14 @@ import hashlib
 import json
 import math
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
 from forge._version import __version__
+from forge.compliance.audit import AuditLogger
 from forge.compliance.redaction import PIIRedactor
 from forge.exceptions import MemoryBackendError
 from forge.memory.conversation import ConversationMemory
@@ -50,7 +51,7 @@ from forge.memory.portable import (
     Tombstone,
 )
 from forge.memory.vector import _stable_bucket, _tokenize
-from forge.security.secrets import secret_kinds_in
+from forge.security.secrets import redact_secrets_in, secret_kinds_in
 from forge.types import utcnow
 
 MEMORY_SCHEMA_VERSION: Final = "agent-memory.v1"
@@ -92,6 +93,7 @@ class ExportSummary:
     quarantined: int
     tombstones: int
     embeddings: bool
+    excluded: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -175,17 +177,32 @@ def _refuse_secrets(item_id: str, *values: Any) -> None:
     kinds = secret_kinds_in(*values)
     if kinds:
         raise MemoryTransferError(
-            f"Item {item_id} appears to hold a credential ({', '.join(kinds)}); redact or "
-            "delete it, then export again. Nothing was written."
+            f"Item {item_id} appears to hold a credential ({', '.join(kinds)}). Nothing was "
+            "written. To proceed: redact detected credentials (--redact-secrets), leave this "
+            f"item out of the export (--exclude {item_id} --exclude-reason '...'), or delete "
+            "it under policy. A credential is never exported."
         )
+
+
+def _profile(redact_pii: bool, redact_secrets: bool) -> str | None:
+    if redact_pii and redact_secrets:
+        return "pii-and-secrets"
+    if redact_pii:
+        return "pii"
+    return "secrets" if redact_secrets else None
 
 
 # --- export ----------------------------------------------------------------------------
 
 
-def _document_item(record: MemoryRecord, redactor: PIIRedactor | None) -> dict[str, Any]:
+def _document_item(
+    record: MemoryRecord, redactor: PIIRedactor | None, redact_secrets: bool
+) -> dict[str, Any]:
     text = redactor.redact(record.text) if redactor else record.text
     metadata = redactor.redact_obj(record.metadata) if redactor else record.metadata
+    if redact_secrets:
+        text = redact_secrets_in(text)
+        metadata = redact_secrets_in(metadata)
     _refuse_secrets(record.item_id, text, metadata)
     if len(text.encode("utf-8")) > MAX_TEXT_BYTES:
         raise MemoryTransferError(f"Item {record.item_id} is over 48 KiB; chunk it before export.")
@@ -302,11 +319,22 @@ async def export_memory(
     source_system: str = "agentforge",
     export_id: str | None = None,
     redact_pii: bool = False,
+    redact_secrets: bool = False,
+    exclude: Mapping[str, str] | None = None,
     include_embeddings: bool = True,
     shard_items: int = DEFAULT_SHARD_ITEMS,
+    audit: AuditLogger | None = None,
+    actor: str = "operator",
     now: datetime | None = None,
 ) -> ExportSummary:
-    """Export a portable store as ``agent-memory.v1`` into an empty directory."""
+    """Export a portable store as ``agent-memory.v1`` into an empty directory.
+
+    A credential is never exported. When the check flags an item, the caller can
+    redact detected credentials (``redact_secrets``) or leave named items out of
+    this export (``exclude``: item ID to reason). Each exclusion is recorded in
+    ``audit`` as ``agentforge.memory.export_exclusion``; an excluded item is not
+    deleted and leaves no tombstone.
+    """
     now = now or utcnow()
     export_id = _identifier(export_id or f"exp-{now.strftime('%Y%m%dT%H%M%SZ')}", "export ID")
     _identifier(store_id, "store ID")
@@ -327,7 +355,19 @@ async def export_memory(
             break
         after = page.next_after
     # Every item is checked (and refused) before anything is written.
-    items = [_document_item(record, redactor) for record in records]
+    excluded = dict(exclude or {})
+    if any(not str(reason).strip() for reason in excluded.values()):
+        raise MemoryTransferError("Every excluded item needs a reason.")
+    unknown = sorted(set(excluded) - {record.item_id for record in records})
+    if unknown:
+        raise MemoryTransferError(
+            f"Cannot exclude items the store does not hold: {', '.join(unknown)}."
+        )
+    items = [
+        _document_item(record, redactor, redact_secrets)
+        for record in records
+        if record.item_id not in excluded
+    ]
     tombstones = [
         {"item_id": _identifier(t.item_id, "tombstoned ID"), "deleted_at": _timestamp(t.deleted_at)}
         for t in await store.list_tombstones()
@@ -355,7 +395,7 @@ async def export_memory(
     quarantined = sum(1 for item in items if item["status"] == "quarantined")
     document = _document(
         export_id=export_id,
-        redaction="pii" if redact_pii else None,
+        redaction=_profile(redact_pii, redact_secrets),
         system=source_system,
         backend=backend,
         store={
@@ -373,14 +413,27 @@ async def export_memory(
         now=now,
     )
     path = out_dir / DOCUMENT_NAME
+    digest = _write_json(path, document)
+    if audit is not None:
+        for item_id, reason in sorted(excluded.items()):
+            audit.record(
+                "agentforge.memory.export_exclusion",
+                actor=actor,
+                resource=item_id,
+                outcome="excluded",
+                export_id=export_id,
+                export_sha256=digest,
+                reason=reason,
+            )
     return ExportSummary(
         path=path,
-        sha256=_write_json(path, document),
+        sha256=digest,
         export_id=export_id,
         items=len(items),
         quarantined=quarantined,
         tombstones=len(tombstones),
         embeddings=embeddings is not None,
+        excluded=tuple(sorted(excluded)),
     )
 
 
@@ -392,6 +445,7 @@ def export_conversation(
     source_system: str = "agentforge",
     export_id: str | None = None,
     redact_pii: bool = False,
+    redact_secrets: bool = False,
     now: datetime | None = None,
 ) -> ExportSummary:
     """Export a conversation transcript as an ``agent-memory.v1`` conversation store.
@@ -423,6 +477,11 @@ def export_conversation(
         metadata = redactor.redact_obj(message.metadata) if redactor else message.metadata
         if redactor:
             calls = redactor.redact_obj(calls)
+        if redact_secrets:
+            text = redact_secrets_in(text)
+            metadata = redact_secrets_in(metadata)
+            calls = redact_secrets_in(calls)
+            results = redact_secrets_in(results)
         _refuse_secrets(item_id, text, metadata, calls, results)
         records.append(
             {
@@ -444,7 +503,7 @@ def export_conversation(
     _empty_target(out_dir)
     document = _document(
         export_id=export_id,
-        redaction="pii" if redact_pii else None,
+        redaction=_profile(redact_pii, redact_secrets),
         system=_identifier(source_system, "source system"),
         backend="conversation_buffer",
         store={

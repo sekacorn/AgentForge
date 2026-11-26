@@ -299,14 +299,40 @@ def memory_export(
     redact_pii: Annotated[
         bool, typer.Option("--redact-pii", help="Redact common PII patterns before export.")
     ] = False,
+    redact_secrets: Annotated[
+        bool,
+        typer.Option(
+            "--redact-secrets",
+            help="Replace detected credentials with [REDACTED:<kind>] instead of stopping.",
+        ),
+    ] = False,
+    exclude: Annotated[
+        list[str] | None,
+        typer.Option("--exclude", help="Leave this item out of the export (repeatable)."),
+    ] = None,
+    exclude_reason: Annotated[
+        str,
+        typer.Option("--exclude-reason", help="Why the excluded items are left out (audited)."),
+    ] = "",
+    operator: Annotated[
+        str, typer.Option("--operator", help="Who made the exclusion decision (audited).")
+    ] = "operator",
     no_embeddings: Annotated[
         bool, typer.Option("--no-embeddings", help="Do not write the linked vector inventory.")
     ] = False,
 ) -> None:
-    """Export the configured memory store as agent-memory.v1."""
+    """Export the configured memory store as agent-memory.v1.
+
+    A flagged credential stops the export. Proceed with --redact-secrets, or with
+    --exclude ITEM --exclude-reason "...", which is recorded in the audit log.
+    """
+    from forge.compliance.audit import AuditLogger
     from forge.memory.transfer import export_memory
 
     config = ForgeConfig.load()
+    if exclude and not exclude_reason.strip():
+        _fail(typer.BadParameter("--exclude needs --exclude-reason."))
+    audit = AuditLogger(config.compliance.audit_path, enabled=config.compliance.audit_enabled)
     try:
         store = _portable_store(config)
         summary = asyncio.run(
@@ -319,7 +345,11 @@ def memory_export(
                     backend=_BACKEND_NAMES[config.memory_backend],
                     export_id=export_id,
                     redact_pii=redact_pii,
+                    redact_secrets=redact_secrets,
+                    exclude=dict.fromkeys(exclude or [], exclude_reason),
                     include_embeddings=not no_embeddings,
+                    audit=audit,
+                    actor=operator,
                 ),
             )
         )
@@ -328,6 +358,7 @@ def memory_export(
     err_console.print(
         f"Exported {summary.items} item(s) ({summary.quarantined} quarantined) and "
         f"{summary.tombstones} tombstone(s) to {summary.path}"
+        + (f"; excluded {len(summary.excluded)} (audited)" if summary.excluded else "")
     )
     sys.stdout.write(f"{summary.sha256}  {summary.path.name}\n")
 

@@ -48,8 +48,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **No secrets leave.** An export stops, writing nothing, if any item's text or
   metadata still looks like a credential (private keys, cloud access-key IDs,
   common API-token formats, JWTs, bearer headers, URLs with credentials); the
-  error names the item and the kind, never the value. `redact_pii=True` applies
-  the PII redactor first and records it in the document.
+  error names the item and the kind, never the value, and lists the ways to
+  proceed. There is no option to export the credential itself:
+  - `redact_secrets=True` (`--redact-secrets`) replaces each detected
+    credential with `[REDACTED:<kind>]` and records the redaction profile in
+    the document (`secrets`, or `pii-and-secrets` with `redact_pii`);
+  - `exclude={item_id: reason}` (`--exclude ITEM --exclude-reason "..."`) leaves
+    named items out of this export; the reason is required, each exclusion is
+    recorded in the audit log as `agentforge.memory.export_exclusion` with the
+    operator and the export digest, and the item is not deleted;
+  - or delete the item under policy, which leaves a tombstone.
+  `redact_pii=True` applies the PII redactor first and records it too.
 - **Review before use.** `forge.memory.review.list_quarantine` shows quarantined
   items with their source and any prompt-injection indicators, never their
   text. `review_items` activates or rejects them by ID or by export; a flagged

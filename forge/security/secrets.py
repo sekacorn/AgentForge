@@ -58,3 +58,21 @@ def secret_kinds_in(*values: Any) -> list[str]:
                 if kind not in found:
                     found.append(kind)
     return found
+
+
+def redact_secrets(text: str) -> str:
+    """Replace every detected credential with ``[REDACTED:<kind>]``."""
+    for kind, pattern in _PATTERNS:
+        text = pattern.sub(f"[REDACTED:{kind}]", text)
+    return text
+
+
+def redact_secrets_in(value: Any) -> Any:
+    """``redact_secrets`` over strings, or nested dicts and lists of them."""
+    if isinstance(value, str):
+        return redact_secrets(value)
+    if isinstance(value, dict):
+        return {key: redact_secrets_in(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [redact_secrets_in(item) for item in value]
+    return value
