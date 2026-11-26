@@ -9,6 +9,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`forge mcp serve` / `McpToolServer`: Forge tools as an MCP server
+  (checkpoint 9b).** The owner's exposure rules are enforced before anything
+  listens:
+  - off by default;
+  - only tools named with `--expose`, never "all";
+  - dangerous tools (`http_get`, sandboxed execution) need `--allow-dangerous`
+    as well;
+  - stdio by default, and HTTP on loopback only unless `--allow-non-loopback`;
+  - HTTP requires a bearer token (from an environment variable) or an OAuth
+    `token_verifier`. OAuth tokens must be issued for this server's resource
+    (RFC 8707).
+
+  Every inbound call is audited, including refused and unauthenticated ones,
+  as `agentforge.mcp.server_call`: caller, tool, outcome and duration, with
+  redacted, capped arguments, any injection indicators, and the result's
+  digest and length (never its content).
+
+  Caller input is treated as untrusted: bounded, cleaned, schema-validated,
+  screened, and run under the sandbox policy and timeout. Failures reach the
+  caller as their exception class only.
 - **Contract tests for `tool-inventory.v1`.** Ahead of `forge tools
   inventory`, a contract module pins three things against the suite:
   - the names, origins and definition hashes a connector records fit the

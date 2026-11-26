@@ -380,3 +380,76 @@ def approve(
         _say(f"Commit {servers_file.approvals} and {servers_file.definitions}/ to your repository.")
     if outcome.refused:
         raise typer.Exit(code=2)
+
+
+# --- serve -----------------------------------------------------------------------------------
+
+
+def _builtin_registry() -> object:
+    from forge.tools import SAFE_TOOLS, http_get
+    from forge.tools.registry import ToolRegistry
+
+    return ToolRegistry([*SAFE_TOOLS, http_get])
+
+
+@app.command("serve")
+def serve(
+    expose: Annotated[
+        list[str] | None,
+        typer.Option("--expose", help="A built-in tool to serve, by name (repeatable). Required."),
+    ] = None,
+    allow_dangerous: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--allow-dangerous",
+            help="Also allow this dangerous tool (repeatable; must be exposed).",
+        ),
+    ] = None,
+    http: Annotated[
+        bool, typer.Option("--http", help="Serve Streamable HTTP instead of stdio.")
+    ] = False,
+    host: Annotated[
+        str, typer.Option("--host", help="HTTP bind address (loopback by default).")
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="HTTP port.")] = 8765,
+    allow_non_loopback: Annotated[
+        bool, typer.Option("--allow-non-loopback", help="Permit a non-loopback HTTP bind address.")
+    ] = False,
+    bearer_token_env: Annotated[
+        str | None,
+        typer.Option(
+            "--bearer-token-env",
+            help="Environment variable holding the token HTTP callers must send.",
+        ),
+    ] = None,
+) -> None:
+    """Serve named built-in tools over MCP. Nothing is served unless named with --expose.
+
+    stdio is the default. Every message about the server goes to stderr, because
+    stdout carries the MCP stream. Every inbound call is audited.
+    """
+    from forge.tools.mcp.serve import McpServeConfig, McpToolServer
+    from forge.tools.registry import ToolRegistry
+
+    try:
+        config = McpServeConfig(
+            transport="streamable_http" if http else "stdio",
+            expose=list(expose or []),
+            allow_dangerous=list(allow_dangerous or []),
+            host=host,
+            port=port,
+            allow_non_loopback=allow_non_loopback,
+            bearer_token_env=bearer_token_env,
+        )
+        forge_config = ForgeConfig.load()
+        audit = AuditLogger(
+            forge_config.compliance.audit_path, enabled=forge_config.compliance.audit_enabled
+        )
+        registry = _builtin_registry()
+        assert isinstance(registry, ToolRegistry)  # nosec B101
+        server = McpToolServer(registry, config, audit=audit)
+    except (ForgeError, ValueError) as exc:
+        raise _fail(str(exc)) from None
+    where = f"http://{host}:{port}/mcp" if http else "stdio"
+    typer.echo(f"Serving {', '.join(config.expose)} over {where}; every call is audited.", err=True)
+    asyncio.run(server.run_http() if http else server.run_stdio())
