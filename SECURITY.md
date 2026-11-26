@@ -17,10 +17,10 @@ All advisories: [github.com/sekacorn/AgentForge/security/advisories](https://git
 
 Please do not report a suspected vulnerability in a public issue.
 
-Use **Report a vulnerability** on the repository's
-[Security tab](https://github.com/sekacorn/AgentForge/security) when it is
-available. If it is not, open an issue titled "Security contact request" that
-contains **no details**, and the maintainer will arrange a private channel.
+Report a suspected vulnerability privately with **Report a vulnerability** on the repository's
+[Security tab](https://github.com/sekacorn/AgentForge/security) (direct link: [github.com/sekacorn/AgentForge/security/advisories/new](https://github.com/sekacorn/AgentForge/security/advisories/new)).
+This is GitHub's private vulnerability reporting: the report stays private between you and the
+maintainers until an advisory is published.
 
 Include the affected version, reproduction steps and the impact you observed.
 Never include real credentials: a placeholder such as `sk-...` is enough to show
