@@ -126,8 +126,10 @@ need `accept_flagged=True`); add it with `approvals.with_approval(...)`,
 record the definition with `DefinitionStore(...).save(found.definition())`,
 and save both.
 
-Each format has a JSON Schema in `forge/tools/mcp/` and examples in
-`docs/examples/mcp/`. An approvals file:
+Each format has a JSON Schema and examples. The AI Infrastructure Suite owns the
+canonical schemas; the copies in `forge/tools/mcp/` must match them, and the
+`suite-contract` job checks that everything Forge writes meets them. Examples
+are in `docs/examples/mcp/`. An approvals file:
 
 ```json
 {

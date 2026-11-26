@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`suite-contract` covers the MCP formats.** `tool-approvals.v1`,
+  `mcp-servers.v1` and `tool-definition.v1` are now owned by the AI
+  Infrastructure Suite. A new contract module checks four things:
+  - the copies packaged here have not drifted from the suite's;
+  - every approvals file and definition snapshot Forge writes meets the
+    suite's schemas, and approvals also parse with the suite's stricter reader;
+  - every server origin Forge records is one the suite accepts;
+  - both sides refuse the same invalid server entries.
 - **`forge mcp status` and `forge mcp approve`.** Approving an MCP tool always
   shows what is being approved:
   - a new tool's full definition (description, input and output schema,
